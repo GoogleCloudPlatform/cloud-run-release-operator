@@ -22,6 +22,7 @@ type ServiceOpts struct {
 
 func generateService(opts *ServiceOpts) *run.Service {
 	return &run.Service{
+		Metadata: &run.ObjectMeta{},
 		Spec: &run.ServiceSpec{
 			Traffic: opts.Traffic,
 		},
@@ -172,14 +173,14 @@ func TestManage(t *testing.T) {
 
 	for _, test := range tests {
 
-		client.ServiceFn = func(name string) (*run.Service, error) {
+		client.ServiceFn = func(namespaces, serviceID string) (*run.Service, error) {
 			opts := &ServiceOpts{
 				LatestReadyRevision: test.lastReady,
 				Traffic:             test.traffic,
 			}
 			return generateService(opts), nil
 		}
-		client.ReplaceServiceFn = func(name string, svc *run.Service) (*run.Service, error) {
+		client.ReplaceServiceFn = func(namespace, serviceID string, svc *run.Service) (*run.Service, error) {
 			return svc, nil
 		}
 
@@ -357,7 +358,7 @@ func TestManageServiceFailed(t *testing.T) {
 
 	// When retrieving service fails, an error should be returned.
 	client.ServiceInvoked = false
-	client.ServiceFn = func(name string) (*run.Service, error) {
+	client.ServiceFn = func(name, serviceID string) (*run.Service, error) {
 		return nil, errors.New("bad request")
 	}
 	_, err := r.Manage()
@@ -366,7 +367,7 @@ func TestManageServiceFailed(t *testing.T) {
 
 	// When Service returns nil, an error should be returned since service does not exist.
 	client.ServiceInvoked = false
-	client.ServiceFn = func(name string) (*run.Service, error) {
+	client.ServiceFn = func(name, serviceID string) (*run.Service, error) {
 		return nil, nil
 	}
 	_, err = r.Manage()

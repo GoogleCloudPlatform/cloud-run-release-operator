@@ -1,8 +1,6 @@
 package rollout
 
 import (
-	"fmt"
-
 	runapi "github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/run"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/config"
 	"github.com/pkg/errors"
@@ -38,13 +36,14 @@ func New(client runapi.Client, config *config.Config, logger *logrus.Logger) *Ro
 
 // Manage handles the gradual rollout.
 func (r *Rollout) Manage() (*run.Service, error) {
-	serviceName := generateServiceName(r.Config.Metadata.Project, r.Config.Metadata.Service)
-	svc, err := r.RunClient.Service(serviceName)
+	project := r.Config.Metadata.Project
+	service := r.Config.Metadata.Service
+	svc, err := r.RunClient.Service(project, service)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not get service")
 	}
 	if svc == nil {
-		return nil, errors.Errorf("service %s does not exist", serviceName)
+		return nil, errors.Errorf("service %q does not exist", service)
 	}
 
 	stable := DetectStableRevisionName(svc)
@@ -61,7 +60,7 @@ func (r *Rollout) Manage() (*run.Service, error) {
 
 	svc = r.SplitTraffic(svc, stable, candidate)
 	svc = r.updateAnnotations(svc, stable, candidate)
-	svc, err = r.RunClient.ReplaceService(serviceName, svc)
+	svc, err = r.RunClient.ReplaceService(project, service, svc)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not update service")
 	}
@@ -175,9 +174,6 @@ func (r *Rollout) nextCandidateTraffic(current int64) int64 {
 
 // updateAnnotations updates the annotations to keep some state about the rollout.
 func (r *Rollout) updateAnnotations(svc *run.Service, stable, candidate string) *run.Service {
-	if svc.Metadata == nil {
-		svc.Metadata = &run.ObjectMeta{}
-	}
 	if svc.Metadata.Annotations == nil {
 		svc.Metadata.Annotations = make(map[string]string)
 	}
@@ -203,12 +199,4 @@ func newTrafficTarget(revision string, percent int64, tag string) *run.TrafficTa
 		Percent:      percent,
 		Tag:          tag,
 	}
-}
-
-// generateServiceName returns the name of the specified service. It returns the
-// form namespaces/{namespace_id}/services/{service_id}.
-//
-// For Cloud Run (fully managed), the namespace is the project ID or number.
-func generateServiceName(namespace, serviceID string) string {
-	return fmt.Sprintf("namespaces/%s/services/%s", namespace, serviceID)
 }
