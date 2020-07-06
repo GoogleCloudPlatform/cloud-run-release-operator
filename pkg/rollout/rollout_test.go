@@ -22,7 +22,6 @@ type ServiceOpts struct {
 
 func generateService(opts *ServiceOpts) *run.Service {
 	return &run.Service{
-		Metadata: &run.ObjectMeta{},
 		Spec: &run.ServiceSpec{
 			Traffic: opts.Traffic,
 		},
@@ -373,19 +372,4 @@ func TestManageServiceFailed(t *testing.T) {
 	_, err = r.Manage()
 	assert.True(t, client.ServiceInvoked, "Service method was not called")
 	assert.NotNil(t, err)
-}
-
-// equalArray checks that the values of two arrays are equivalent.
-func assertArray(t *testing.T, expected, actual []string) {
-	assert.Equal(t, len(expected), len(actual), "The size of the arrays are not equal.")
-	for _, v1 := range expected {
-		found := false
-		for _, v2 := range actual {
-			if v1 == v2 {
-				found = true
-			}
-		}
-
-		assert.True(t, found, "Expected value not found.", v1)
-	}
 }
