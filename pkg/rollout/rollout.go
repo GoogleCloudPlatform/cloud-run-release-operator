@@ -40,7 +40,7 @@ func (r *Rollout) Manage() (*run.Service, error) {
 	service := r.Config.Metadata.Service
 	svc, err := r.RunClient.Service(project, service)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not get service")
+		return nil, errors.Wrapf(err, "could not get service %q", service)
 	}
 	if svc == nil {
 		return nil, errors.Errorf("service %q does not exist", service)
@@ -48,13 +48,13 @@ func (r *Rollout) Manage() (*run.Service, error) {
 
 	stable := DetectStableRevisionName(svc)
 	if stable == "" {
-		r.Log.Infoln("Could not determine stable revision")
+		r.LoggerWithFields().Info("Could not determine stable revision")
 		return nil, nil
 	}
 
 	candidate := DetectCandidateRevisionName(svc, stable)
 	if candidate == "" {
-		r.Log.Infoln("Could not determine candidate revision")
+		r.LoggerWithFields().Info("Could not determine candidate revision")
 		return nil, nil
 	}
 
@@ -62,7 +62,7 @@ func (r *Rollout) Manage() (*run.Service, error) {
 	svc = r.updateAnnotations(svc, stable, candidate)
 	svc, err = r.RunClient.ReplaceService(project, service, svc)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not update service")
+		return nil, errors.Wrapf(err, "could not update service %q", service)
 	}
 
 	return svc, nil
@@ -99,15 +99,25 @@ func (r *Rollout) SplitTraffic(svc *run.Service, stable, candidate string) *run.
 	traffic = append(traffic, &run.TrafficTarget{LatestRevision: true, Tag: LatestTag})
 
 	if !r.promoteToStable {
-		r.Log.Infof("Assigning %d%% of the traffic to stable revision %s", stablePercent, stable)
-		r.Log.Infof("Assigning %d%% of the traffic to candidate revision %s", candidateTraffic.Percent, candidate)
+		r.LoggerWithFields().Infof("Assigning %d%% of the traffic to stable revision %s", stablePercent, stable)
+		r.LoggerWithFields().Infof("Assigning %d%% of the traffic to candidate revision %s", candidateTraffic.Percent, candidate)
 	} else {
-		r.Log.Infof("Making revision %s stable\n", candidate)
+		r.LoggerWithFields().Infof("Making revision %s stable", candidate)
 	}
 
 	svc.Spec.Traffic = traffic
 
 	return svc
+}
+
+// LoggerWithFields returns the logger that includes fields with data about the
+// service.
+func (r *Rollout) LoggerWithFields() *logrus.Entry {
+	return r.Log.WithFields(logrus.Fields{
+		"project": r.Config.Metadata.Project,
+		"region":  r.Config.Metadata.Region,
+		"service": r.Config.Metadata.Service,
+	})
 }
 
 // newCandidateTraffic returns the next candidate's traffic configuration.
