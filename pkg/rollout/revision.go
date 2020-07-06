@@ -52,9 +52,8 @@ func DetectCandidateRevisionName(svc *run.Service, stable string) string {
 // find100PercentServingRevisionName scans the service and retrieves a revision
 // with 100% traffic.
 func find100PercentServingRevisionName(svc *run.Service) string {
-	candidate := svc.Metadata.Annotations[CandidateRevisionAnnotation]
 	for _, target := range svc.Status.Traffic {
-		if target.Percent == 100 && target.RevisionName != candidate {
+		if target.Percent == 100 && target.Tag != CandidateTag {
 			return target.RevisionName
 		}
 	}

@@ -145,7 +145,6 @@ func userDefinedTrafficTags(svc *run.Service) []*run.TrafficTarget {
 			target.Tag != StableTag && target.Tag != CandidateTag {
 
 			traffic = append(traffic, target)
-			continue
 		}
 	}
 
@@ -176,6 +175,10 @@ func (r *Rollout) nextCandidateTraffic(current int64) int64 {
 
 // updateAnnotations updates the annotations to keep some state about the rollout.
 func (r *Rollout) updateAnnotations(svc *run.Service, stable, candidate string) *run.Service {
+	if svc.Metadata.Annotations == nil {
+		svc.Metadata.Annotations = make(map[string]string)
+	}
+
 	// The candidate has become the stable revision.
 	if r.promoteToStable {
 		svc.Metadata.Annotations[StableRevisionAnnotation] = candidate
