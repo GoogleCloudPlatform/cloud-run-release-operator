@@ -14,7 +14,7 @@ const (
 //
 // It first checks if there's a revision with the tag "stable". If such a
 // revision does not exist, it checks for a revision with 100% of the traffic
-// and consider it stable.
+// and considers it stable.
 func DetectStableRevisionName(svc *run.Service) string {
 	stableRevision := findRevisionWithTag(svc, StableTag)
 	if stableRevision == "" {

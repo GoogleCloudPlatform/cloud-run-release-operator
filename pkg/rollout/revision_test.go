@@ -76,21 +76,21 @@ func TestDetectStableRevisionName(t *testing.T) {
 func TestDetectCandidateRevisionName(t *testing.T) {
 	var tests = []struct {
 		name           string
-		lastestReady   string
+		latestReady    string
 		stableRevision string
 		expected       string
 	}{
 		// Latest revision is the same as the stable one.
 		{
 			name:           "same latest and stable revisions",
-			lastestReady:   "test-001",
+			latestReady:    "test-001",
 			stableRevision: "test-001",
 			expected:       "",
 		},
 		// Latest revision is not the same as the stable one.
 		{
 			name:           "different latest and stable revisions",
-			lastestReady:   "test-002",
+			latestReady:    "test-002",
 			stableRevision: "test-001",
 			expected:       "test-002",
 		},
@@ -98,7 +98,7 @@ func TestDetectCandidateRevisionName(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			opts := &ServiceOpts{LatestReadyRevision: test.lastestReady}
+			opts := &ServiceOpts{LatestReadyRevision: test.latestReady}
 			svc := generateService(opts)
 			candidate := rollout.DetectCandidateRevisionName(svc, test.stableRevision)
 
