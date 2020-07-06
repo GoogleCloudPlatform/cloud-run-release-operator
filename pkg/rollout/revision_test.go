@@ -63,28 +63,33 @@ func TestDetectStableRevisionName(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		opts := &ServiceOpts{Traffic: test.traffic}
-		svc := generateService(opts)
-		stable := rollout.DetectStableRevisionName(svc)
+		t.Run(test.name, func(t *testing.T) {
+			opts := &ServiceOpts{Traffic: test.traffic}
+			svc := generateService(opts)
+			stable := rollout.DetectStableRevisionName(svc)
 
-		assert.Equal(t, test.expected, stable)
+			assert.Equal(t, test.expected, stable)
+		})
 	}
 }
 
 func TestDetectCandidateRevisionName(t *testing.T) {
 	var tests = []struct {
+		name           string
 		lastestReady   string
 		stableRevision string
 		expected       string
 	}{
-		// Latest Revision is the same as the stable one.
+		// Latest revision is the same as the stable one.
 		{
+			name:           "same latest and stable revisions",
 			lastestReady:   "test-001",
 			stableRevision: "test-001",
 			expected:       "",
 		},
-		// Latest Revision is not the same as the stable one.
+		// Latest revision is not the same as the stable one.
 		{
+			name:           "different latest and stable revisions",
 			lastestReady:   "test-002",
 			stableRevision: "test-001",
 			expected:       "test-002",
@@ -92,10 +97,12 @@ func TestDetectCandidateRevisionName(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		opts := &ServiceOpts{LatestReadyRevision: test.lastestReady}
-		svc := generateService(opts)
-		candidate := rollout.DetectCandidateRevisionName(svc, test.stableRevision)
+		t.Run(test.name, func(t *testing.T) {
+			opts := &ServiceOpts{LatestReadyRevision: test.lastestReady}
+			svc := generateService(opts)
+			candidate := rollout.DetectCandidateRevisionName(svc, test.stableRevision)
 
-		assert.Equal(t, test.expected, candidate)
+			assert.Equal(t, test.expected, candidate)
+		})
 	}
 }

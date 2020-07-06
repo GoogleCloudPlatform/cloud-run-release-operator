@@ -1,13 +1,14 @@
 package rollout_test
 
 import (
+	"io/ioutil"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/run/mock"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/config"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/rollout"
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/api/run/v1"
 )
@@ -199,7 +200,10 @@ func TestManage(t *testing.T) {
 			return svc, nil
 		}
 
-		r := rollout.New(client, config, log.New())
+		lg := logrus.New()
+		lg.Out = ioutil.Discard
+		r := rollout.New(client, config, lg)
+
 		svc, err := r.Manage()
 		if test.shouldErr {
 			assert.NotNil(t, err)
@@ -326,7 +330,10 @@ func TestSplitTraffic(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		r := rollout.New(client, config, log.New())
+		lg := logrus.New()
+		lg.Out = ioutil.Discard
+		r := rollout.New(client, config, lg)
+
 		opts := &ServiceOpts{
 			Traffic: test.traffic,
 		}
@@ -349,7 +356,9 @@ func TestManageServiceFailed(t *testing.T) {
 			Steps: []int64{5, 30, 60},
 		},
 	}
-	r := rollout.New(client, config, log.New())
+	lg := logrus.New()
+	lg.Out = ioutil.Discard
+	r := rollout.New(client, config, lg)
 
 	// When retrieving service fails, an error should be returned.
 	client.ServiceInvoked = false

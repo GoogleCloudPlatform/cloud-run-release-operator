@@ -5,22 +5,16 @@ import (
 
 	runapi "github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/run"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/config"
-	format "github.com/logrusorgru/aurora"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/api/run/v1"
 )
-
-// Logger describes a logger printing information to the user.
-type Logger interface {
-	Println(args ...interface{})
-	Printf(format string, args ...interface{})
-}
 
 // Rollout is the rollout manager.
 type Rollout struct {
 	RunClient        runapi.Client
 	Config           *config.Config
-	Log              Logger
+	Log              *logrus.Logger
 	promoteCandidate bool
 }
 
@@ -32,11 +26,11 @@ const (
 )
 
 // New returns a new rollout manager.
-func New(client runapi.Client, config *config.Config, log Logger) *Rollout {
+func New(client runapi.Client, config *config.Config, logger *logrus.Logger) *Rollout {
 	return &Rollout{
 		RunClient:        client,
 		Config:           config,
-		Log:              log,
+		Log:              logger,
 		promoteCandidate: false,
 	}
 }
@@ -123,10 +117,10 @@ func (r *Rollout) SplitTraffic(svc *run.Service, stable, candidate string) *run.
 	traffic = append(traffic, &run.TrafficTarget{LatestRevision: true, Tag: LatestTag})
 
 	if !r.promoteCandidate {
-		r.Log.Printf("Assigning %d%% of the traffic to stable revision %s", 100-candidatePercent, format.Bold(stable))
-		r.Log.Printf("Assigning %d%% of the traffic to candidate revision %s", candidatePercent, format.Bold(candidate))
+		r.Log.Printf("Assigning %d%% of the traffic to stable revision %s", 100-candidatePercent, stable)
+		r.Log.Printf("Assigning %d%% of the traffic to candidate revision %s", candidatePercent, candidate)
 	} else {
-		r.Log.Printf("Making revision %s stable\n", format.Bold(candidate))
+		r.Log.Printf("Making revision %s stable\n", candidate)
 	}
 
 	svc.Spec.Traffic = traffic
