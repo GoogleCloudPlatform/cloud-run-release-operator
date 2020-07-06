@@ -52,13 +52,13 @@ func (r *Rollout) Manage() (*run.Service, error) {
 		return nil, errors.Errorf("service %s does not exist", serviceName)
 	}
 
-	stable := StableRevision(svc)
+	stable := DetectStableRevisionName(svc)
 	if stable == "" {
 		r.Log.Println("Could not determine stable revision")
 		return nil, nil
 	}
 
-	candidate := CandidateRevision(svc, stable)
+	candidate := DetectCandidateRevisionName(svc, stable)
 	if candidate == "" {
 		r.Log.Println("Could not determine candidate revision")
 		return nil, nil

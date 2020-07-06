@@ -21,7 +21,6 @@ import (
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/run"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/config"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/rollout"
-	format "github.com/logrusorgru/aurora"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -38,19 +37,19 @@ func main() {
 	}
 	log := log.New()
 
-	client, err := run.NewAPIClient(context.TODO(), config.Metadata.Region)
+	client, err := run.NewAPIClient(context.Background(), config.Metadata.Region)
 	if err != nil {
-		log.Fatal("could not initilize Cloud Run client", err)
+		log.Fatalf("could not initilize Cloud Run client: %v\n", err)
 	}
 	roll := rollout.New(client, config, log)
 
 	svc, err := roll.Manage()
 	if err != nil {
-		log.Println(format.Red("Rollout failed:").Bold(), err)
+		log.Printf("Rollout failed: %v\n", err)
 	}
 
 	if svc != nil {
-		log.Println(format.Green("Rollout process succeeded").Bold())
+		log.Println("Rollout process succeeded")
 	}
 
 	interval := time.Duration(config.Rollout.Interval)
