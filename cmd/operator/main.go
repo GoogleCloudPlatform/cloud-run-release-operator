@@ -39,17 +39,17 @@ func main() {
 
 	client, err := run.NewAPIClient(context.Background(), config.Metadata.Region)
 	if err != nil {
-		log.Fatalf("could not initilize Cloud Run client: %v\n", err)
+		log.Infof("could not initilize Cloud Run client: %v\n", err)
 	}
 	roll := rollout.New(client, config, log)
 
 	svc, err := roll.Manage()
 	if err != nil {
-		log.Printf("Rollout failed: %v\n", err)
+		log.Infof("Rollout failed: %v\n", err)
 	}
 
 	if svc != nil {
-		log.Println("Rollout process succeeded")
+		log.Infoln("Rollout process succeeded")
 	}
 
 	interval := time.Duration(config.Rollout.Interval)

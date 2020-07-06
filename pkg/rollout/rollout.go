@@ -12,10 +12,12 @@ import (
 
 // Rollout is the rollout manager.
 type Rollout struct {
-	RunClient        runapi.Client
-	Config           *config.Config
-	Log              *logrus.Logger
-	promoteCandidate bool
+	RunClient runapi.Client
+	Config    *config.Config
+	Log       *logrus.Logger
+
+	// Used to determine if candidate should become stable during update.
+	promoteToStable bool
 }
 
 // Automatic tags.
@@ -28,10 +30,9 @@ const (
 // New returns a new rollout manager.
 func New(client runapi.Client, config *config.Config, logger *logrus.Logger) *Rollout {
 	return &Rollout{
-		RunClient:        client,
-		Config:           config,
-		Log:              logger,
-		promoteCandidate: false,
+		RunClient: client,
+		Config:    config,
+		Log:       logger,
 	}
 }
 
@@ -48,13 +49,13 @@ func (r *Rollout) Manage() (*run.Service, error) {
 
 	stable := DetectStableRevisionName(svc)
 	if stable == "" {
-		r.Log.Println("Could not determine stable revision")
+		r.Log.Infoln("Could not determine stable revision")
 		return nil, nil
 	}
 
 	candidate := DetectCandidateRevisionName(svc, stable)
 	if candidate == "" {
-		r.Log.Println("Could not determine candidate revision")
+		r.Log.Infoln("Could not determine candidate revision")
 		return nil, nil
 	}
 
@@ -70,57 +71,39 @@ func (r *Rollout) Manage() (*run.Service, error) {
 
 // SplitTraffic changes the traffic configuration of the service.
 //
-// It creates a new traffic slice in case there's a new candidate revision.
-// If we only drop the traffic of the previous candidate to 0, Cloud Run would
-// still consider it as serving traffic and the slice of traffic targets would
-// grow very large over time.
+// It creates a new traffic configuration for the service. It creates a new
+// traffic configuration for the candidate and stable revisions.
+// The method respects user-defined revision tags.
 func (r *Rollout) SplitTraffic(svc *run.Service, stable, candidate string) *run.Service {
-	candidateTarget, candidatePercent := r.candidateTraffic(svc, candidate)
-	if candidateTarget == nil {
-		candidatePercent = r.Config.Rollout.Steps[0]
-	} else if candidatePercent == candidateTarget.Percent {
-		// If the traffic share did not change, candidate already handled 100%
-		// and is now ready to become stable.
-		r.promoteCandidate = true
-	}
 
 	var traffic []*run.TrafficTarget
-	candidateTarget = newTrafficTarget(candidate, candidatePercent, CandidateTag)
-	if r.promoteCandidate {
-		candidateTarget.Tag = StableTag
+	var stablePercent int64
+
+	candidateTraffic, promoteCandidateToStable := r.newCandidateTraffic(svc, candidate)
+	if promoteCandidateToStable {
+		r.promoteToStable = true
+		candidateTraffic.Tag = StableTag
+	} else {
+		// If candidate is not being promoted, also include traffic
+		// configuration for stable revision.
+		stablePercent = 100 - candidateTraffic.Percent
+		stableTraffic := newTrafficTarget(stable, stablePercent, StableTag)
+		traffic = append(traffic, stableTraffic)
 	}
+	traffic = append(traffic, candidateTraffic)
 
-	traffic = append(traffic, candidateTarget)
-	for _, target := range svc.Spec.Traffic {
-		// Respect tags manually introduced by the user.
-		if target.Tag != "" && !target.LatestRevision &&
-			target.Tag != StableTag && target.Tag != CandidateTag {
-
-			traffic = append(traffic, target)
-			continue
-		}
-
-		// When the user introduces a tag manually (UI/gcloud), Cloud Run breaks
-		// all targets with (Name, Tag, Percent) into two different targets
-		// (Name, Tag) and (Name, Percent).
-		// This recovers from this by ignoring the (Name, Tag) target.
-		if (target.Tag == StableTag || target.Tag == CandidateTag) && target.Percent == 0 {
-			continue
-		}
-
-		if target.RevisionName == stable && !r.promoteCandidate {
-			traffic = append(traffic, newTrafficTarget(target.RevisionName, 100-candidatePercent, StableTag))
-		}
-	}
+	// Respect tags manually introduced by the user (e.g. UI/gcloud).
+	customTags := userDefinedTrafficTags(svc)
+	traffic = append(traffic, customTags...)
 
 	// Always assign latest tag to the latest revision.
 	traffic = append(traffic, &run.TrafficTarget{LatestRevision: true, Tag: LatestTag})
 
-	if !r.promoteCandidate {
-		r.Log.Printf("Assigning %d%% of the traffic to stable revision %s", 100-candidatePercent, stable)
-		r.Log.Printf("Assigning %d%% of the traffic to candidate revision %s", candidatePercent, candidate)
+	if !r.promoteToStable {
+		r.Log.Infof("Assigning %d%% of the traffic to stable revision %s", stablePercent, stable)
+		r.Log.Infof("Assigning %d%% of the traffic to candidate revision %s", candidateTraffic.Percent, candidate)
 	} else {
-		r.Log.Printf("Making revision %s stable\n", candidate)
+		r.Log.Infof("Making revision %s stable\n", candidate)
 	}
 
 	svc.Spec.Traffic = traffic
@@ -128,16 +111,56 @@ func (r *Rollout) SplitTraffic(svc *run.Service, stable, candidate string) *run.
 	return svc
 }
 
-// candidateTraffic returns the traffic configuration for the candidate and the
-// next traffic share for the candidate.
-func (r *Rollout) candidateTraffic(svc *run.Service, candidate string) (*run.TrafficTarget, int64) {
-	for _, target := range svc.Status.Traffic {
-		if target.RevisionName == candidate && target.Percent > 0 {
-			return target, r.nextCandidateTraffic(target.Percent)
+// newCandidateTraffic returns the next candidate's traffic configuration.
+//
+// It also checks if the candidate should be promoted to stable in the next
+// update and returns a boolean about that.
+func (r *Rollout) newCandidateTraffic(svc *run.Service, candidate string) (*run.TrafficTarget, bool) {
+	var promoteToStable bool
+	var candidatePercent int64
+	candidateTarget := r.currentCandidateTraffic(svc, candidate)
+	if candidateTarget == nil {
+		candidatePercent = r.Config.Rollout.Steps[0]
+	} else {
+		candidatePercent = r.nextCandidateTraffic(candidateTarget.Percent)
+
+		// If the traffic share did not change, candidate already handled 100%
+		// and is now ready to become stable.
+		if candidatePercent == candidateTarget.Percent {
+			promoteToStable = true
 		}
 	}
 
-	return nil, 0
+	candidateTarget = newTrafficTarget(candidate, candidatePercent, CandidateTag)
+
+	return candidateTarget, promoteToStable
+}
+
+// userDefinedTrafficTags returns the traffic configurations that include tags
+// that were defined by the user (e.g. UI/gcloud).
+func userDefinedTrafficTags(svc *run.Service) []*run.TrafficTarget {
+	var traffic []*run.TrafficTarget
+	for _, target := range svc.Spec.Traffic {
+		if target.Tag != "" && !target.LatestRevision &&
+			target.Tag != StableTag && target.Tag != CandidateTag {
+
+			traffic = append(traffic, target)
+			continue
+		}
+	}
+
+	return traffic
+}
+
+// currentCandidateTraffic returns the traffic configuration for the candidate.
+func (r *Rollout) currentCandidateTraffic(svc *run.Service, candidate string) *run.TrafficTarget {
+	for _, target := range svc.Status.Traffic {
+		if target.RevisionName == candidate && target.Percent > 0 {
+			return target
+		}
+	}
+
+	return nil
 }
 
 // nextCandidateTraffic calculates the next traffic share for the candidate.
@@ -154,7 +177,7 @@ func (r *Rollout) nextCandidateTraffic(current int64) int64 {
 // updateAnnotations updates the annotations to keep some state about the rollout.
 func (r *Rollout) updateAnnotations(svc *run.Service, stable, candidate string) *run.Service {
 	// The candidate has become the stable revision.
-	if r.promoteCandidate {
+	if r.promoteToStable {
 		svc.Metadata.Annotations[StableRevisionAnnotation] = candidate
 		delete(svc.Metadata.Annotations, CandidateRevisionAnnotation)
 
