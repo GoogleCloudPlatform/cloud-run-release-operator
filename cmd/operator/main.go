@@ -16,11 +16,13 @@ package main
 
 import (
 	"context"
-	"time"
+	"os"
 
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/run"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/config"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/rollout"
+	stackdriver "github.com/TV4/logrus-stackdriver-formatter"
+	isatty "github.com/mattn/go-isatty"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -35,23 +37,25 @@ func main() {
 			Steps: []int64{5, 30, 80},
 		},
 	}
+
 	log := log.New()
+	if !isatty.IsTerminal(os.Stdout.Fd()) {
+		log.Formatter = stackdriver.NewFormatter(
+			stackdriver.WithService("cloud-run-release-operator"),
+		)
+	}
 
 	client, err := run.NewAPIClient(context.Background(), config.Metadata.Region)
 	if err != nil {
 		log.Fatalf("could not initilize Cloud Run client: %v", err)
 	}
-	roll := rollout.New(client, config, log)
+	roll := rollout.New(client, config).WithLogger(log)
 
 	changed, err := roll.Rollout()
 	if err != nil {
-		roll.LoggerWithFields().Infof("Rollout failed: %v", err)
+		log.Infof("Rollout failed: %v", err)
 	}
-
 	if changed {
-		roll.LoggerWithFields().Info("Rollout process succeeded")
+		log.Info("Rollout process succeeded")
 	}
-
-	interval := time.Duration(config.Rollout.Interval)
-	time.Sleep(interval * time.Second)
 }

@@ -1,7 +1,6 @@
 package rollout_test
 
 import (
-	"io/ioutil"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/run/mock"
@@ -9,7 +8,6 @@ import (
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/rollout"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/api/run/v1"
 )
@@ -184,10 +182,7 @@ func TestUpdateService(t *testing.T) {
 			return svc, nil
 		}
 
-		lg := logrus.New()
-		lg.Out = ioutil.Discard
-
-		r := rollout.New(client, config, lg)
+		r := rollout.New(client, config)
 
 		t.Run(test.name, func(t *testing.T) {
 			svc, err := r.UpdateService(config.Metadata.Project, config.Metadata.Service)
@@ -324,9 +319,7 @@ func TestSplitTraffic(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		lg := logrus.New()
-		lg.Out = ioutil.Discard
-		r := rollout.New(client, config, lg)
+		r := rollout.New(client, config)
 
 		opts := &ServiceOpts{
 			Traffic: test.traffic,
@@ -352,9 +345,7 @@ func TestUpdateServiceFailed(t *testing.T) {
 			Steps: []int64{5, 30, 60},
 		},
 	}
-	lg := logrus.New()
-	lg.Out = ioutil.Discard
-	r := rollout.New(client, config, lg)
+	r := rollout.New(client, config)
 
 	// When retrieving service fails, an error should be returned.
 	client.ServiceInvoked = false

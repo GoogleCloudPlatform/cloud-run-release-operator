@@ -1,6 +1,8 @@
 package rollout
 
 import (
+	"io/ioutil"
+
 	runapi "github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/run"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/config"
 	"github.com/pkg/errors"
@@ -12,7 +14,7 @@ import (
 type Rollout struct {
 	RunClient runapi.Client
 	Config    *config.Config
-	Log       *logrus.Logger
+	Log       *logrus.Entry
 
 	// Used to determine if candidate should become stable during update.
 	promoteToStable bool
@@ -26,18 +28,34 @@ const (
 )
 
 // New returns a new rollout manager.
-func New(client runapi.Client, config *config.Config, logger *logrus.Logger) *Rollout {
+func New(client runapi.Client, config *config.Config) *Rollout {
+	logger := logrus.New()
+	logger.SetOutput(ioutil.Discard)
+
 	return &Rollout{
 		RunClient: client,
 		Config:    config,
-		Log:       logger,
+		Log:       logger.WithField("project", config.Metadata.Project),
 	}
+}
+
+// WithLogger updates the logger in the rollout instance.
+func (r *Rollout) WithLogger(logger *logrus.Logger) *Rollout {
+	r.Log = logger.WithField("project", r.Config.Metadata.Project)
+	return r
 }
 
 // Rollout handles the gradual rollout.
 func (r *Rollout) Rollout() (bool, error) {
 	project := r.Config.Metadata.Project
 	serviceID := r.Config.Metadata.Service
+	region := r.Config.Metadata.Region
+
+	r.Log = r.Log.WithFields(logrus.Fields{
+		"project": project,
+		"service": serviceID,
+		"region":  region,
+	})
 
 	svc, err := r.UpdateService(project, serviceID)
 	if err != nil {
@@ -61,13 +79,13 @@ func (r *Rollout) UpdateService(project, serviceID string) (*run.Service, error)
 
 	stable := DetectStableRevisionName(svc)
 	if stable == "" {
-		r.LoggerWithFields().Info("Could not determine stable revision")
+		r.Log.Info("Could not determine stable revision")
 		return nil, nil
 	}
 
 	candidate := DetectCandidateRevisionName(svc, stable)
 	if candidate == "" {
-		r.LoggerWithFields().Info("Could not determine candidate revision")
+		r.Log.Info("Could not determine candidate revision")
 		return nil, nil
 	}
 
@@ -112,25 +130,15 @@ func (r *Rollout) SplitTraffic(svc *run.Service, stable, candidate string) *run.
 	traffic = append(traffic, &run.TrafficTarget{LatestRevision: true, Tag: LatestTag})
 
 	if !r.promoteToStable {
-		r.LoggerWithFields().Infof("Assigning %d%% of the traffic to stable revision %s", stablePercent, stable)
-		r.LoggerWithFields().Infof("Assigning %d%% of the traffic to candidate revision %s", candidateTraffic.Percent, candidate)
+		r.Log.Infof("Assigning %d%% of the traffic to stable revision %s", stablePercent, stable)
+		r.Log.Infof("Assigning %d%% of the traffic to candidate revision %s", candidateTraffic.Percent, candidate)
 	} else {
-		r.LoggerWithFields().Infof("Making revision %s stable", candidate)
+		r.Log.Infof("Making revision %s stable", candidate)
 	}
 
 	svc.Spec.Traffic = traffic
 
 	return svc
-}
-
-// LoggerWithFields returns the logger that includes fields with data about the
-// service.
-func (r *Rollout) LoggerWithFields() *logrus.Entry {
-	return r.Log.WithFields(logrus.Fields{
-		"project": r.Config.Metadata.Project,
-		"region":  r.Config.Metadata.Region,
-		"service": r.Config.Metadata.Service,
-	})
 }
 
 // newCandidateTraffic returns the next candidate's traffic configuration.
