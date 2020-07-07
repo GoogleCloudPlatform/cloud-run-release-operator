@@ -33,7 +33,7 @@ func generateService(opts *ServiceOpts) *run.Service {
 	}
 }
 
-func TestManage(t *testing.T) {
+func TestUpdateService(t *testing.T) {
 	client := &mock.RunAPI{}
 	config := &config.Config{
 		Metadata: &config.Metadata{
@@ -190,7 +190,7 @@ func TestManage(t *testing.T) {
 		r := rollout.New(client, config, lg)
 
 		t.Run(test.name, func(t *testing.T) {
-			svc, err := r.Manage()
+			svc, err := r.UpdateService(config.Metadata.Project, config.Metadata.Service)
 			if test.shouldErr {
 				assert.NotNil(t, err)
 			} else if test.nilService {
@@ -340,8 +340,8 @@ func TestSplitTraffic(t *testing.T) {
 	}
 }
 
-// TestManageServiceFailed tests Manage when retrieving information on a service fails.
-func TestManageServiceFailed(t *testing.T) {
+// TestUpdateServiceFailed tests Manage when retrieving information on a service fails.
+func TestUpdateServiceFailed(t *testing.T) {
 	client := &mock.RunAPI{}
 	config := &config.Config{
 		Metadata: &config.Metadata{
@@ -361,7 +361,7 @@ func TestManageServiceFailed(t *testing.T) {
 	client.ServiceFn = func(name, serviceID string) (*run.Service, error) {
 		return nil, errors.New("bad request")
 	}
-	_, err := r.Manage()
+	_, err := r.UpdateService(config.Metadata.Project, config.Metadata.Service)
 	assert.True(t, client.ServiceInvoked, "Service method was not called")
 	assert.NotNil(t, err)
 
@@ -370,7 +370,7 @@ func TestManageServiceFailed(t *testing.T) {
 	client.ServiceFn = func(name, serviceID string) (*run.Service, error) {
 		return nil, nil
 	}
-	_, err = r.Manage()
+	_, err = r.UpdateService(config.Metadata.Project, config.Metadata.Service)
 	assert.True(t, client.ServiceInvoked, "Service method was not called")
 	assert.NotNil(t, err)
 }

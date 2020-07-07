@@ -34,16 +34,29 @@ func New(client runapi.Client, config *config.Config, logger *logrus.Logger) *Ro
 	}
 }
 
-// Manage handles the gradual rollout.
-func (r *Rollout) Manage() (*run.Service, error) {
+// Rollout handles the gradual rollout.
+func (r *Rollout) Rollout() (bool, error) {
 	project := r.Config.Metadata.Project
-	service := r.Config.Metadata.Service
-	svc, err := r.RunClient.Service(project, service)
+	serviceID := r.Config.Metadata.Service
+
+	svc, err := r.UpdateService(project, serviceID)
 	if err != nil {
-		return nil, errors.Wrapf(err, "could not get service %q", service)
+		return false, errors.Wrapf(err, "failed to perform rollout")
+	}
+
+	// Service is non-nil only when the replacement of the service succeded.
+	return (svc != nil), nil
+}
+
+// UpdateService changes the traffic configuration for the revisions and update
+// the service.
+func (r *Rollout) UpdateService(project, serviceID string) (*run.Service, error) {
+	svc, err := r.RunClient.Service(project, serviceID)
+	if err != nil {
+		return nil, errors.Wrapf(err, "could not get service %q", serviceID)
 	}
 	if svc == nil {
-		return nil, errors.Errorf("service %q does not exist", service)
+		return nil, errors.Errorf("service %q does not exist", serviceID)
 	}
 
 	stable := DetectStableRevisionName(svc)
@@ -60,9 +73,9 @@ func (r *Rollout) Manage() (*run.Service, error) {
 
 	svc = r.SplitTraffic(svc, stable, candidate)
 	svc = r.updateAnnotations(svc, stable, candidate)
-	svc, err = r.RunClient.ReplaceService(project, service, svc)
+	svc, err = r.RunClient.ReplaceService(project, serviceID, svc)
 	if err != nil {
-		return nil, errors.Wrapf(err, "could not update service %q", service)
+		return nil, errors.Wrapf(err, "could not update service %q", serviceID)
 	}
 
 	return svc, nil

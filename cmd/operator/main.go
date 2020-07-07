@@ -43,12 +43,12 @@ func main() {
 	}
 	roll := rollout.New(client, config, log)
 
-	svc, err := roll.Manage()
+	changed, err := roll.Rollout()
 	if err != nil {
 		roll.LoggerWithFields().Infof("Rollout failed: %v", err)
 	}
 
-	if svc != nil {
+	if changed {
 		roll.LoggerWithFields().Info("Rollout process succeeded")
 	}
 
