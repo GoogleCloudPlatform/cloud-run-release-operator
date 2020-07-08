@@ -66,10 +66,10 @@ func isValid(config *Config, cliMode bool) bool {
 		return false
 	}
 
-	// Steps must be in ascending order.
+	// Steps must be in ascending order and not greater than 100.
 	var previous int64
 	for _, step := range config.Rollout.Steps {
-		if previous >= step {
+		if step <= previous || step > 100 {
 			return false
 		}
 		previous = step
