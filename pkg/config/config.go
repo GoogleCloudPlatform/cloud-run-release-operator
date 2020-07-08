@@ -37,7 +37,7 @@ func Decode(data []byte, cliMode bool) (*Config, error) {
 			return nil, errors.Wrap(err, "could not unmarshal data")
 		}
 	} else {
-		err := json.Unmarshal(data, &config)
+		err := json.Unmarshal(data, config)
 		if err != nil {
 			return nil, errors.Wrap(err, "could not unmarshal data")
 		}
