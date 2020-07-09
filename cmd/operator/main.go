@@ -19,6 +19,7 @@ import (
 	"flag"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/run"
@@ -52,14 +53,15 @@ func (steps stepFlags) String() string {
 }
 
 var (
-	flCLI        bool
-	flConfigFile string
-	flHTTPAddr   string
-	flProject    string
-	flRegion     string
-	flService    string
-	flSteps      stepFlags
-	flInterval   int64
+	flCLI         bool
+	flConfigFile  string
+	flHTTPAddr    string
+	flProject     string
+	flRegion      string
+	flService     string
+	flSteps       stepFlags
+	flStepsString string
+	flInterval    int64
 )
 
 func init() {
@@ -69,6 +71,7 @@ func init() {
 	flag.StringVar(&flRegion, "region", "", "the Cloud Run region where the service is deployed")
 	flag.StringVar(&flService, "service", "", "the service to manage")
 	flag.Var(&flSteps, "step", "step is percentage the candidate should go through")
+	flag.StringVar(&flStepsString, "steps", "", "define steps in one flag separated by commas (e.g. 5,30,60)")
 	flag.Int64Var(&flInterval, "interval", 0, "the time between each rollout step")
 	flag.Parse()
 
@@ -78,6 +81,20 @@ func init() {
 
 	if flCLI && flHTTPAddr != "" {
 		log.Fatal("only one of -cli or -http-addr can be used")
+	}
+
+	// -steps flag has precedence over the list of -step flags.
+	if flStepsString != "" {
+		steps := strings.Split(flStepsString, ",")
+		flSteps = []int64{}
+		for _, step := range steps {
+			value, err := strconv.ParseInt(step, 10, 64)
+			if err != nil {
+				log.Fatal("invalid step value: %v", err)
+			}
+
+			flSteps = append(flSteps, value)
+		}
 	}
 }
 
