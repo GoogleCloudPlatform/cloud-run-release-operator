@@ -90,7 +90,7 @@ func init() {
 		for _, step := range steps {
 			value, err := strconv.ParseInt(step, 10, 64)
 			if err != nil {
-				log.Fatal("invalid step value: %v", err)
+				log.Fatalf("invalid step value: %v", err)
 			}
 
 			flSteps = append(flSteps, value)
