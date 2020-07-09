@@ -70,7 +70,7 @@ func init() {
 	flag.StringVar(&flProject, "project", "", "project in which the service is deployed")
 	flag.StringVar(&flRegion, "region", "", "the Cloud Run region where the service is deployed")
 	flag.StringVar(&flService, "service", "", "the service to manage")
-	flag.Var(&flSteps, "step", "step is percentage the candidate should go through")
+	flag.Var(&flSteps, "step", "a percentage in traffic the candidate should go through")
 	flag.StringVar(&flStepsString, "steps", "", "define steps in one flag separated by commas (e.g. 5,30,60)")
 	flag.Int64Var(&flInterval, "interval", 0, "the time between each rollout step")
 	flag.Parse()
