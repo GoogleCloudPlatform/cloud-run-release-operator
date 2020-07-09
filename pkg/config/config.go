@@ -1,12 +1,5 @@
 package config
 
-import (
-	"encoding/json"
-
-	"github.com/pkg/errors"
-	"gopkg.in/yaml.v2"
-)
-
 // Metadata is the information on the service to be managed.
 type Metadata struct {
 	Project string `json:"project" yaml:"project"`
@@ -26,31 +19,23 @@ type Config struct {
 	Rollout  *Rollout  `json:"rollout" yaml:"rollout"`
 }
 
-// Decode returns the configuration struct based on the data provided by the
-// operator.
-func Decode(data []byte, cliMode bool) (*Config, error) {
-	config := &Config{}
-
-	if cliMode {
-		err := yaml.Unmarshal(data, config)
-		if err != nil {
-			return nil, errors.Wrap(err, "could not unmarshal data")
-		}
-	} else {
-		err := json.Unmarshal(data, config)
-		if err != nil {
-			return nil, errors.Wrap(err, "could not unmarshal data")
-		}
+// WithValues initializes a configuration with the given values.
+func WithValues(project, region, service string, steps []int64, interval int64) *Config {
+	return &Config{
+		Metadata: &Metadata{
+			Project: project,
+			Region:  region,
+			Service: service,
+		},
+		Rollout: &Rollout{
+			Steps:    steps,
+			Interval: interval,
+		},
 	}
-
-	if !isValid(config, cliMode) {
-		return nil, errors.New("invalid configuration")
-	}
-
-	return config, nil
 }
 
-func isValid(config *Config, cliMode bool) bool {
+// IsValid checks if the configuration is valid.
+func (config *Config) IsValid(cliMode bool) bool {
 	if config.Metadata.Project == "" ||
 		config.Metadata.Service == "" ||
 		config.Metadata.Region == "" {

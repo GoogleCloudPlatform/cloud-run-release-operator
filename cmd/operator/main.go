@@ -17,8 +17,8 @@ package main
 import (
 	"context"
 	"flag"
-	"io/ioutil"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/run"
@@ -26,20 +26,50 @@ import (
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/rollout"
 	stackdriver "github.com/TV4/logrus-stackdriver-formatter"
 	isatty "github.com/mattn/go-isatty"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
+
+type stepFlags []int64
+
+func (steps *stepFlags) Set(step string) error {
+	value, err := strconv.ParseInt(step, 10, 64)
+	if err != nil {
+		return errors.Wrap(err, "failed to parse step")
+	}
+	*steps = append(*steps, value)
+	return nil
+}
+
+func (steps stepFlags) String() string {
+	var value string
+	for _, step := range steps {
+		value += " " + strconv.FormatInt(step, 10)
+	}
+
+	return value
+}
 
 var (
 	flCLI        bool
 	flConfigFile string
 	flHTTPAddr   string
+	flProject    string
+	flRegion     string
+	flService    string
+	flSteps      stepFlags
+	flInterval   int64
 )
 
 func init() {
 	flag.BoolVar(&flCLI, "cli", false, "run as CLI application to manage rollout in intervals")
-	flag.StringVar(&flConfigFile, "file", "", "the configuration file for the rollout in CLI mode")
 	flag.StringVar(&flHTTPAddr, "http-addr", "", "listen on http portrun on request (e.g. :8080)")
+	flag.StringVar(&flProject, "project", "", "project in which the service is deployed")
+	flag.StringVar(&flRegion, "region", "", "the Cloud Run region where the service is deployed")
+	flag.StringVar(&flService, "service", "", "the service to manage")
+	flag.Var(&flSteps, "step", "step is percentage the candidate should go through")
+	flag.Int64Var(&flInterval, "interval", 0, "the time between each rollout step")
 	flag.Parse()
 
 	if !flCLI && flHTTPAddr == "" {
@@ -48,10 +78,6 @@ func init() {
 
 	if flCLI && flHTTPAddr != "" {
 		log.Fatal("only one of -cli or -http-addr can be used")
-	}
-
-	if flCLI && flConfigFile == "" {
-		log.Fatal("use -file to set configuration file")
 	}
 }
 
@@ -69,20 +95,16 @@ func main() {
 }
 
 func runCLI(logger *logrus.Logger, file string) {
-	fileData, err := ioutil.ReadFile(file)
-	if err != nil {
-		log.Fatalf("config file could not be read: %v", err)
-	}
-	config, err := config.Decode(fileData, true)
-	if err != nil {
-		log.Fatalf("invalid config file: %v", err)
+	cfg := config.WithValues(flProject, flRegion, flService, flSteps, flInterval)
+	if !cfg.IsValid(true) {
+		log.Fatalf("invalid config values")
 	}
 
-	client, err := run.NewAPIClient(context.Background(), config.Metadata.Region)
+	client, err := run.NewAPIClient(context.Background(), cfg.Metadata.Region)
 	if err != nil {
 		log.Fatalf("could not initilize Cloud Run client: %v", err)
 	}
-	roll := rollout.New(client, config).WithLogger(logger)
+	roll := rollout.New(client, cfg).WithLogger(logger)
 
 	for {
 		changed, err := roll.Rollout()
@@ -93,7 +115,7 @@ func runCLI(logger *logrus.Logger, file string) {
 			log.Info("Rollout process succeeded")
 		}
 
-		interval := time.Duration(config.Rollout.Interval)
+		interval := time.Duration(cfg.Rollout.Interval)
 		time.Sleep(interval * time.Second)
 	}
 }

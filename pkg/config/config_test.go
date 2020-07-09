@@ -7,139 +7,59 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var yaml1 = `
-metadata:
-  project: "test"
-  service: "hello"
-  region: "us-east1"
-rollout:
-  steps: [5, 30, 60]
-  interval: 300`
-
-var yaml2 = `
-metadata:
-  service: "hello"
-  region: "us-east1"
-rollout:
-  steps: [5, 30, 60]
-  interval: 300`
-
-var yaml3 = `
-metadata:
-  project: "test"
-  service: "hello"
-  region: "us-east1"
-rollout:
-  interval: 300`
-
-var yaml4 = `
-metadata:
-  project: "test"
-  service: "hello"
-  region: "us-east1"
-rollout:
-  steps: [30, 30, 60]
-  interval: 300`
-
-var yaml5 = `
-metadata:
-  project: "test"
-service: "hello"
-  region: "us-east1"
-  rollout:
-steps: [5, 30, 105]`
-
-var yaml6 = `
-metadata:
-  project: "test"
-  service: "hello"
-  region: "us-east1"
-rollout:
-  steps: [5, 30, 60]`
-
-func TestDecode(t *testing.T) {
+func TestIsValid(t *testing.T) {
 	tests := []struct {
-		name      string
-		data      []byte
-		cliMode   bool
-		expected  *config.Config
-		shouldErr bool
+		name     string
+		config   *config.Config
+		cliMode  bool
+		expected bool
 	}{
 		{
-			name:    "correct config file",
-			data:    []byte(yaml1),
-			cliMode: true,
-			expected: &config.Config{
-				Metadata: &config.Metadata{
-					Project: "test",
-					Service: "hello",
-					Region:  "us-east1",
-				},
-				Rollout: &config.Rollout{
-					Steps:    []int64{5, 30, 60},
-					Interval: 300,
-				},
-			},
-			shouldErr: false,
+			name:     "correct config",
+			config:   config.WithValues("myproject", "us-east1", "mysvc", []int64{5, 30, 60}, 20),
+			cliMode:  true,
+			expected: true,
 		},
 		// No project.
 		{
-			name:      "missing project",
-			data:      []byte(yaml2),
-			cliMode:   true,
-			expected:  nil,
-			shouldErr: true,
+			name:     "missing project",
+			config:   config.WithValues("", "us-east1", "mysvc", []int64{5, 30, 60}, 20),
+			cliMode:  true,
+			expected: false,
 		},
 		// No steps
 		{
-			name:      "missing steps",
-			data:      []byte(yaml3),
-			cliMode:   true,
-			expected:  nil,
-			shouldErr: true,
+			name:     "missing steps",
+			config:   config.WithValues("myproject", "us-east1", "mysvc", []int64{}, 20),
+			cliMode:  true,
+			expected: false,
 		},
 		// Steps are not in ascending order.
 		{
-			name:      "steps not in order",
-			data:      []byte(yaml4),
-			cliMode:   true,
-			expected:  nil,
-			shouldErr: true,
+			name:     "steps not in order",
+			config:   config.WithValues("myproject", "us-east1", "mysvc", []int64{30, 30, 60}, 20),
+			cliMode:  true,
+			expected: false,
 		},
 		// A step is greater than 100.
 		{
-			name:      "step greater than 100",
-			data:      []byte(yaml5),
-			cliMode:   true,
-			expected:  nil,
-			shouldErr: true,
+			name:     "step greater than 100",
+			config:   config.WithValues("myproject", "us-east1", "mysvc", []int64{5, 30, 101}, 20),
+			cliMode:  true,
+			expected: false,
 		},
 		// No interval for CLI mode.
 		{
-			name:      "no interval for cli mode",
-			data:      []byte(yaml6),
-			cliMode:   true,
-			expected:  nil,
-			shouldErr: true,
+			name:     "no interval for cli mode",
+			config:   config.WithValues("myproject", "us-east1", "mysvc", []int64{5, 30, 101}, 0),
+			cliMode:  true,
+			expected: false,
 		},
 	}
 
 	for _, test := range tests {
-		config, err := config.Decode(test.data, test.cliMode)
-		if test.shouldErr {
-			assert.NotNil(t, err)
-			continue
-		}
+		isValid := test.config.IsValid(test.cliMode)
 
-		assertConfig(t, test.expected, config)
+		assert.Equal(t, test.expected, isValid)
 	}
-}
-
-func assertConfig(t *testing.T, expected, actual *config.Config) {
-	assert.Equal(t, expected.Metadata.Project, actual.Metadata.Project)
-	assert.Equal(t, expected.Metadata.Service, actual.Metadata.Service)
-	assert.Equal(t, expected.Metadata.Region, actual.Metadata.Region)
-
-	assert.Equal(t, expected.Rollout.Steps, actual.Rollout.Steps)
-	assert.Equal(t, expected.Rollout.Interval, actual.Rollout.Interval)
 }
