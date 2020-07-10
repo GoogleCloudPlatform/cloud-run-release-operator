@@ -29,7 +29,6 @@ import (
 	isatty "github.com/mattn/go-isatty"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	log "github.com/sirupsen/logrus"
 )
 
 type stepFlags []int64
@@ -73,6 +72,10 @@ func init() {
 	flag.StringVar(&flStepsString, "steps", "", "define steps in one flag separated by commas (e.g. 5,30,60)")
 	flag.Int64Var(&flInterval, "interval", 0, "the time between each rollout step")
 	flag.Parse()
+}
+
+func main() {
+	logger := logrus.New()
 
 	// -steps flag has precedence over the list of -step flags.
 	if flStepsString != "" {
@@ -81,29 +84,26 @@ func init() {
 		for _, step := range steps {
 			value, err := strconv.ParseInt(step, 10, 64)
 			if err != nil {
-				log.Fatalf("invalid step value: %v", err)
+				logger.Fatalf("invalid step value: %v", err)
 			}
 
 			flSteps = append(flSteps, value)
 		}
 	}
-}
 
-func main() {
 	if !flCLI && flHTTPAddr == "" {
-		log.Fatal("one of -cli or -http-addr must be set")
+		logger.Fatal("one of -cli or -http-addr must be set")
 	}
 
 	if flCLI && flHTTPAddr != "" {
-		log.Fatal("only one of -cli or -http-addr can be used")
+		logger.Fatal("only one of -cli or -http-addr can be used")
 	}
 
 	cfg := config.WithValues(flProject, flRegion, flService, flSteps, flInterval)
 	if !cfg.IsValid(flCLI) {
-		log.Fatalf("invalid config values")
+		logger.Fatalf("invalid config values")
 	}
 
-	logger := log.New()
 	if !isatty.IsTerminal(os.Stdout.Fd()) {
 		logger.Formatter = stackdriver.NewFormatter(
 			stackdriver.WithService("cloud-run-release-operator"),
@@ -119,17 +119,17 @@ func runCLI(logger *logrus.Logger, cfg *config.Config) {
 
 	client, err := run.NewAPIClient(context.Background(), cfg.Metadata.Region)
 	if err != nil {
-		log.Fatalf("could not initilize Cloud Run client: %v", err)
+		logger.Fatalf("could not initilize Cloud Run client: %v", err)
 	}
 	roll := rollout.New(client, cfg).WithLogger(logger)
 
 	for {
 		changed, err := roll.Rollout()
 		if err != nil {
-			log.Infof("Rollout failed: %v", err)
+			logger.Infof("Rollout failed: %v", err)
 		}
 		if changed {
-			log.Info("Rollout process succeeded")
+			logger.Info("Rollout process succeeded")
 		}
 
 		interval := time.Duration(cfg.Rollout.Interval)
