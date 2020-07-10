@@ -54,7 +54,6 @@ func (steps stepFlags) String() string {
 
 var (
 	flCLI         bool
-	flConfigFile  string
 	flHTTPAddr    string
 	flProject     string
 	flRegion      string
@@ -75,14 +74,6 @@ func init() {
 	flag.Int64Var(&flInterval, "interval", 0, "the time between each rollout step")
 	flag.Parse()
 
-	if !flCLI && flHTTPAddr == "" {
-		log.Fatal("one of -cli or -http-addr must be set")
-	}
-
-	if flCLI && flHTTPAddr != "" {
-		log.Fatal("only one of -cli or -http-addr can be used")
-	}
-
 	// -steps flag has precedence over the list of -step flags.
 	if flStepsString != "" {
 		steps := strings.Split(flStepsString, ",")
@@ -99,6 +90,19 @@ func init() {
 }
 
 func main() {
+	if !flCLI && flHTTPAddr == "" {
+		log.Fatal("one of -cli or -http-addr must be set")
+	}
+
+	if flCLI && flHTTPAddr != "" {
+		log.Fatal("only one of -cli or -http-addr can be used")
+	}
+
+	cfg := config.WithValues(flProject, flRegion, flService, flSteps, flInterval)
+	if !cfg.IsValid(flCLI) {
+		log.Fatalf("invalid config values")
+	}
+
 	logger := log.New()
 	if !isatty.IsTerminal(os.Stdout.Fd()) {
 		logger.Formatter = stackdriver.NewFormatter(
@@ -107,15 +111,11 @@ func main() {
 	}
 
 	if flCLI {
-		runCLI(logger, flConfigFile)
+		runCLI(logger, cfg)
 	}
 }
 
-func runCLI(logger *logrus.Logger, file string) {
-	cfg := config.WithValues(flProject, flRegion, flService, flSteps, flInterval)
-	if !cfg.IsValid(true) {
-		log.Fatalf("invalid config values")
-	}
+func runCLI(logger *logrus.Logger, cfg *config.Config) {
 
 	client, err := run.NewAPIClient(context.Background(), cfg.Metadata.Region)
 	if err != nil {
