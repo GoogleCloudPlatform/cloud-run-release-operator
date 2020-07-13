@@ -7,6 +7,7 @@ import (
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/run/mock"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/config"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/rollout"
+	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/service"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
@@ -33,7 +34,7 @@ func generateService(opts *ServiceOpts) *run.Service {
 }
 
 func TestUpdateService(t *testing.T) {
-	client := &mock.RunAPI{}
+	runclient := &mock.RunAPI{}
 	strategy := &config.Strategy{
 		Steps: []int64{10, 40, 70},
 	}
@@ -166,18 +167,18 @@ func TestUpdateService(t *testing.T) {
 
 	for _, test := range tests {
 
-		client.ServiceFn = func(namespaces, serviceID string) (*run.Service, error) {
+		runclient.ServiceFn = func(namespaces, serviceID string) (*run.Service, error) {
 			opts := &ServiceOpts{
 				LatestReadyRevision: test.lastReady,
 				Traffic:             test.traffic,
 			}
 			return generateService(opts), nil
 		}
-		client.ReplaceServiceFn = func(namespace, serviceID string, svc *run.Service) (*run.Service, error) {
+		runclient.ReplaceServiceFn = func(namespace, serviceID string, svc *run.Service) (*run.Service, error) {
 			return svc, nil
 		}
 
-		r := rollout.New(client, strategy)
+		r := rollout.New(&service.Client{RunClient: runclient}, strategy)
 
 		t.Run(test.name, func(t *testing.T) {
 			svc, err := r.UpdateService("myproject", "mysvc")
@@ -195,7 +196,7 @@ func TestUpdateService(t *testing.T) {
 }
 
 func TestSplitTraffic(t *testing.T) {
-	client := &mock.RunAPI{}
+	runclient := &mock.RunAPI{}
 	strategy := &config.Strategy{
 		Steps: []int64{5, 30, 60},
 	}
@@ -308,7 +309,7 @@ func TestSplitTraffic(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		r := rollout.New(client, strategy)
+		r := rollout.New(&service.Client{RunClient: runclient}, strategy)
 
 		opts := &ServiceOpts{
 			Traffic: test.traffic,
@@ -327,27 +328,27 @@ func TestSplitTraffic(t *testing.T) {
 
 // TestUpdateServiceFailed tests Manage when retrieving information on a service fails.
 func TestUpdateServiceFailed(t *testing.T) {
-	client := &mock.RunAPI{}
+	runclient := &mock.RunAPI{}
 	strategy := &config.Strategy{
 		Steps: []int64{10, 40, 70},
 	}
-	r := rollout.New(client, strategy)
+	r := rollout.New(&service.Client{RunClient: runclient}, strategy)
 
 	// When retrieving service fails, an error should be returned.
-	client.ServiceInvoked = false
-	client.ServiceFn = func(name, serviceID string) (*run.Service, error) {
+	runclient.ServiceInvoked = false
+	runclient.ServiceFn = func(name, serviceID string) (*run.Service, error) {
 		return nil, errors.New("bad request")
 	}
 	_, err := r.UpdateService("myproject", "mysvc")
-	assert.True(t, client.ServiceInvoked, "Service method was not called")
+	assert.True(t, runclient.ServiceInvoked, "Service method was not called")
 	assert.NotNil(t, err)
 
 	// When Service returns nil, an error should be returned since service does not exist.
-	client.ServiceInvoked = false
-	client.ServiceFn = func(name, serviceID string) (*run.Service, error) {
+	runclient.ServiceInvoked = false
+	runclient.ServiceFn = func(name, serviceID string) (*run.Service, error) {
 		return nil, nil
 	}
 	_, err = r.UpdateService("myproject", "mysvc")
-	assert.True(t, client.ServiceInvoked, "Service method was not called")
+	assert.True(t, runclient.ServiceInvoked, "Service method was not called")
 	assert.NotNil(t, err)
 }

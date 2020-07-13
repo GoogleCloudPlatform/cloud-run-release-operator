@@ -6,8 +6,8 @@ import (
 
 // Client is the connection to update and obtain data about a single service.
 type Client struct {
-	RunClient runapi.Client
-	Project   string
-	Name      string
-	Region    string
+	RunClient   runapi.Client
+	Project     string
+	ServiceName string
+	Region      string
 }

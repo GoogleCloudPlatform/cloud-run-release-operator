@@ -25,6 +25,7 @@ import (
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/run"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/config"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/rollout"
+	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/service"
 	stackdriver "github.com/TV4/logrus-stackdriver-formatter"
 	isatty "github.com/mattn/go-isatty"
 	"github.com/pkg/errors"
@@ -119,13 +120,16 @@ func main() {
 
 func runCLI(logger *logrus.Logger, cfg *config.Config) {
 
-	client, err := run.NewAPIClient(context.Background(), flRegions[0])
+	runclient, err := run.NewAPIClient(context.Background(), flRegions[0])
 	if err != nil {
 		logger.Fatalf("could not initilize Cloud Run client: %v", err)
 	}
-	roll := rollout.New(client, cfg.Strategy).
-		WithService(cfg.Targets[0].Project, "hello", flRegions[0]).
-		WithLogger(logger)
+	roll := rollout.New(&service.Client{
+		RunClient:   runclient,
+		Project:     cfg.Targets[0].Project,
+		ServiceName: "hello",
+		Region:      flRegions[0],
+	}, cfg.Strategy).WithLogger(logger)
 
 	for {
 		changed, err := roll.Rollout()
