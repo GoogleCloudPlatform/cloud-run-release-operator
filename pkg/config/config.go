@@ -23,7 +23,7 @@ const (
 //   "regions": [us-east1, us-central1]
 //   "selector": {
 //       "type": "labelSelector"
-//       "value": "team=backend"
+//       "filter": "team=backend"
 //    }
 // }
 //
@@ -35,7 +35,7 @@ const (
 //   "regions": [us-east1, us-central1]
 //   "selector": {
 //       "type": "serviceName"
-//       "value": "mysvc"
+//       "filter": "mysvc"
 //    }
 // }
 type Target struct {
