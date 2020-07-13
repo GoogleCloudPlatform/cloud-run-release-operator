@@ -1,4 +1,4 @@
-package metric
+package stackdriver
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"time"
 
 	monitoring "cloud.google.com/go/monitoring/apiv3"
+	"github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/metrics"
 	"github.com/pkg/errors"
 	"google.golang.org/api/iterator"
 	monitoringpb "google.golang.org/genproto/googleapis/monitoring/v3"
@@ -13,37 +14,21 @@ import (
 	timestamp "google.golang.org/protobuf/types/known/timestamppb"
 )
 
-// Client represents a wrapper around the Cloud Monitoring package.
-type Client interface {
-	Latency(ctx context.Context, filter Filter, startTime time.Time) (float64, error)
-}
-
 // API is a wrapper for the Cloud Monitoring package.
 type API struct {
-	Client  *monitoring.MetricClient
+	*monitoring.MetricClient
 	Project string
 }
 
-// Filter is the filter for the query.
-type Filter struct {
-	service  string
-	revision string
-	query    string
+// Query is the filter used to retrieve metrics data.
+type Query struct {
+	filter string
 }
 
 // Metric types.
 const (
 	RequestLatencies = "run.googleapis.com/request_latencies"
 	RequestCount     = "run.googleapis.com/request_count"
-)
-
-type alignReduce int32
-
-// Series aligner and cross series reducer types (for latency).
-const (
-	Align99Reduce99 alignReduce = 1
-	Align95Reduce95             = 2
-	Align50Reduce50             = 3
 )
 
 // NewAPIClient initializes
@@ -54,20 +39,20 @@ func NewAPIClient(ctx context.Context, project string) (*API, error) {
 	}
 
 	return &API{
-		Client:  client,
-		Project: project,
+		MetricClient: client,
+		Project:      project,
 	}, nil
 }
 
 // Latency returns the latency for the resource matching the filter.
-func (a *API) Latency(ctx context.Context, filter Filter, startTime time.Time, alignReduceType alignReduce) (float64, error) {
-	filter = filter.Add("metric.type", RequestLatencies)
+func (a *API) Latency(ctx context.Context, query metrics.Query, startTime time.Time, alignReduceType metrics.AlignReduce) (float64, error) {
+	query.Filter("metric.type", RequestLatencies)
 	endTime := time.Now()
 	aligner, reducer := alignerAndReducer(alignReduceType)
 
-	it := a.Client.ListTimeSeries(ctx, &monitoringpb.ListTimeSeriesRequest{
+	it := a.MetricClient.ListTimeSeries(ctx, &monitoringpb.ListTimeSeriesRequest{
 		Name:   "projects/" + a.Project,
-		Filter: filter.query,
+		Filter: query.Query(),
 		Interval: &monitoringpb.TimeInterval{
 			StartTime: timestamp.New(startTime),
 			EndTime:   timestamp.New(endTime),
@@ -85,13 +70,13 @@ func (a *API) Latency(ctx context.Context, filter Filter, startTime time.Time, a
 
 // ServerErrorRate returns the rate of 5xx errors for the resource matching the
 // filter.
-func (a *API) ServerErrorRate(ctx context.Context, filter Filter, startTime time.Time) (float64, error) {
-	filter = filter.Add("metric.type", RequestCount)
+func (a *API) ServerErrorRate(ctx context.Context, query metrics.Query, startTime time.Time) (float64, error) {
+	query.Filter("metric.type", RequestCount)
 	endTime := time.Now()
 
-	it := a.Client.ListTimeSeries(ctx, &monitoringpb.ListTimeSeriesRequest{
+	it := a.MetricClient.ListTimeSeries(ctx, &monitoringpb.ListTimeSeriesRequest{
 		Name:   "projects/" + a.Project,
-		Filter: filter.query,
+		Filter: query.Query(),
 		Interval: &monitoringpb.TimeInterval{
 			StartTime: timestamp.New(startTime),
 			EndTime:   timestamp.New(endTime),
@@ -169,40 +154,43 @@ func calculateErrorResponseRate(it *monitoring.TimeSeriesIterator) (float64, err
 	return rate, nil
 }
 
-func alignerAndReducer(alignReduceType alignReduce) (aligner monitoringpb.Aggregation_Aligner, reducer monitoringpb.Aggregation_Reducer) {
+func alignerAndReducer(alignReduceType metrics.AlignReduce) (aligner monitoringpb.Aggregation_Aligner, reducer monitoringpb.Aggregation_Reducer) {
 	switch alignReduceType {
-	case Align99Reduce99:
+	case metrics.Align99Reduce99:
 		aligner = monitoringpb.Aggregation_ALIGN_PERCENTILE_99
 		reducer = monitoringpb.Aggregation_REDUCE_PERCENTILE_99
 		break
-	case Align95Reduce95:
+	case metrics.Align95Reduce95:
 		aligner = monitoringpb.Aggregation_ALIGN_PERCENTILE_95
 		reducer = monitoringpb.Aggregation_REDUCE_PERCENTILE_95
 		break
-	case Align50Reduce50:
+	case metrics.Align50Reduce50:
 		aligner = monitoringpb.Aggregation_ALIGN_PERCENTILE_50
 		reducer = monitoringpb.Aggregation_REDUCE_PERCENTILE_50
 		break
 	}
 
-	return aligner, reducer
+	return
 }
 
-// NewFilter initializes a filter for a query.
-func NewFilter(serviceName, revisionName string) Filter {
-	filter := Filter{}
-	filter = filter.Add("resource.labels.service_name", serviceName)
-	filter = filter.Add("resource.labels.revision_name", revisionName)
+// NewQuery initializes a query.
+func NewQuery(serviceName, revisionName string) Query {
+	query := Query{}
+	query.Filter("resource.labels.service_name", serviceName)
+	query.Filter("resource.labels.revision_name", revisionName)
 
-	return filter
+	return query
 }
 
-// Add adds a filter for the query.
-func (f Filter) Add(key string, value string) Filter {
-	if f.query != "" {
-		f.query += " AND "
+// Filter adds a filter for the query.
+func (q *Query) Filter(key, value string) {
+	if q.filter != "" {
+		q.filter += " AND "
 	}
-	f.query += fmt.Sprintf("%s=%q", key, value)
+	q.filter += fmt.Sprintf("%s=%q", key, value)
+}
 
-	return f
+// Query returns the string representation of the query.
+func (q Query) Query() string {
+	return q.filter
 }
