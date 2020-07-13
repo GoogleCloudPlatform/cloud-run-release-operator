@@ -1,11 +1,13 @@
 package rollout_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/run/mock"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/config"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/rollout"
+	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/service"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
@@ -33,12 +35,10 @@ func generateService(opts *ServiceOpts) *run.Service {
 
 func TestUpdateService(t *testing.T) {
 	client := &mock.RunAPI{}
-	config := &config.Config{
-		Metadata: &config.Metadata{
-			Project: "test",
-			Service: "hello",
-		},
-		Rollout: &config.Rollout{
+	config := &service.Config{
+		Project:     "test",
+		ServiceName: "hello",
+		Strategy: &config.Strategy{
 			Steps: []int64{10, 40, 70},
 		},
 	}
@@ -67,8 +67,8 @@ func TestUpdateService(t *testing.T) {
 				rollout.CandidateRevisionAnnotation: "test-003",
 			},
 			outTraffic: []*run.TrafficTarget{
-				{RevisionName: "test-002", Percent: 100 - config.Rollout.Steps[0], Tag: rollout.StableTag},
-				{RevisionName: "test-003", Percent: config.Rollout.Steps[0], Tag: rollout.CandidateTag},
+				{RevisionName: "test-002", Percent: 100 - config.Strategy.Steps[0], Tag: rollout.StableTag},
+				{RevisionName: "test-003", Percent: config.Strategy.Steps[0], Tag: rollout.CandidateTag},
 				{LatestRevision: true, Tag: rollout.LatestTag},
 			},
 		},
@@ -108,8 +108,8 @@ func TestUpdateService(t *testing.T) {
 				rollout.CandidateRevisionAnnotation: "test-002",
 			},
 			outTraffic: []*run.TrafficTarget{
-				{RevisionName: "test-001", Percent: 100 - config.Rollout.Steps[0], Tag: rollout.StableTag},
-				{RevisionName: "test-002", Percent: config.Rollout.Steps[0], Tag: rollout.CandidateTag},
+				{RevisionName: "test-001", Percent: 100 - config.Strategy.Steps[0], Tag: rollout.StableTag},
+				{RevisionName: "test-002", Percent: config.Strategy.Steps[0], Tag: rollout.CandidateTag},
 				{LatestRevision: true, Tag: rollout.LatestTag},
 			},
 		},
@@ -117,8 +117,8 @@ func TestUpdateService(t *testing.T) {
 		{
 			name: "keep rolling out the same candidate",
 			traffic: []*run.TrafficTarget{
-				{RevisionName: "test-001", Percent: 100 - config.Rollout.Steps[1], Tag: rollout.StableTag},
-				{RevisionName: "test-002", Percent: config.Rollout.Steps[1], Tag: rollout.CandidateTag},
+				{RevisionName: "test-001", Percent: 100 - config.Strategy.Steps[1], Tag: rollout.StableTag},
+				{RevisionName: "test-002", Percent: config.Strategy.Steps[1], Tag: rollout.CandidateTag},
 				{LatestRevision: true, Tag: rollout.LatestTag},
 			},
 			lastReady: "test-002",
@@ -127,8 +127,8 @@ func TestUpdateService(t *testing.T) {
 				rollout.CandidateRevisionAnnotation: "test-002",
 			},
 			outTraffic: []*run.TrafficTarget{
-				{RevisionName: "test-001", Percent: 100 - config.Rollout.Steps[2], Tag: rollout.StableTag},
-				{RevisionName: "test-002", Percent: config.Rollout.Steps[2], Tag: rollout.CandidateTag},
+				{RevisionName: "test-001", Percent: 100 - config.Strategy.Steps[2], Tag: rollout.StableTag},
+				{RevisionName: "test-002", Percent: config.Strategy.Steps[2], Tag: rollout.CandidateTag},
 				{LatestRevision: true, Tag: rollout.LatestTag},
 			},
 		},
@@ -136,8 +136,8 @@ func TestUpdateService(t *testing.T) {
 		{
 			name: "different candidate, restart rollout",
 			traffic: []*run.TrafficTarget{
-				{RevisionName: "test-001", Percent: 100 - config.Rollout.Steps[2], Tag: rollout.StableTag},
-				{RevisionName: "test-002", Percent: config.Rollout.Steps[2], Tag: rollout.CandidateTag},
+				{RevisionName: "test-001", Percent: 100 - config.Strategy.Steps[2], Tag: rollout.StableTag},
+				{RevisionName: "test-002", Percent: config.Strategy.Steps[2], Tag: rollout.CandidateTag},
 				{LatestRevision: true, Tag: rollout.LatestTag},
 			},
 			lastReady: "test-003",
@@ -146,8 +146,8 @@ func TestUpdateService(t *testing.T) {
 				rollout.CandidateRevisionAnnotation: "test-003",
 			},
 			outTraffic: []*run.TrafficTarget{
-				{RevisionName: "test-001", Percent: 100 - config.Rollout.Steps[0], Tag: rollout.StableTag},
-				{RevisionName: "test-003", Percent: config.Rollout.Steps[0], Tag: rollout.CandidateTag},
+				{RevisionName: "test-001", Percent: 100 - config.Strategy.Steps[0], Tag: rollout.StableTag},
+				{RevisionName: "test-003", Percent: config.Strategy.Steps[0], Tag: rollout.CandidateTag},
 				{LatestRevision: true, Tag: rollout.LatestTag},
 			},
 		},
@@ -185,7 +185,7 @@ func TestUpdateService(t *testing.T) {
 		r := rollout.New(client, config)
 
 		t.Run(test.name, func(t *testing.T) {
-			svc, err := r.UpdateService(config.Metadata.Project, config.Metadata.Service)
+			svc, err := r.UpdateService(config.Project, config.ServiceName)
 			if test.shouldErr {
 				assert.NotNil(t, err)
 			} else if test.nilService {
@@ -201,12 +201,10 @@ func TestUpdateService(t *testing.T) {
 
 func TestSplitTraffic(t *testing.T) {
 	client := &mock.RunAPI{}
-	config := &config.Config{
-		Metadata: &config.Metadata{
-			Project: "test",
-			Service: "hello",
-		},
-		Rollout: &config.Rollout{
+	config := &service.Config{
+		Project:     "test",
+		ServiceName: "hello",
+		Strategy: &config.Strategy{
 			Steps: []int64{5, 30, 60},
 		},
 	}
@@ -328,6 +326,9 @@ func TestSplitTraffic(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			svc = r.SplitTraffic(svc, test.stable, test.candidate)
+			for _, t := range svc.Spec.Traffic {
+				fmt.Println(t)
+			}
 			assert.True(t, cmp.Equal(test.expected, svc.Spec.Traffic))
 		})
 	}
@@ -336,13 +337,11 @@ func TestSplitTraffic(t *testing.T) {
 // TestUpdateServiceFailed tests Manage when retrieving information on a service fails.
 func TestUpdateServiceFailed(t *testing.T) {
 	client := &mock.RunAPI{}
-	config := &config.Config{
-		Metadata: &config.Metadata{
-			Project: "test",
-			Service: "hello",
-		},
-		Rollout: &config.Rollout{
-			Steps: []int64{5, 30, 60},
+	config := &service.Config{
+		Project:     "test",
+		ServiceName: "hello",
+		Strategy: &config.Strategy{
+			Steps: []int64{10, 40, 70},
 		},
 	}
 	r := rollout.New(client, config)
@@ -352,7 +351,7 @@ func TestUpdateServiceFailed(t *testing.T) {
 	client.ServiceFn = func(name, serviceID string) (*run.Service, error) {
 		return nil, errors.New("bad request")
 	}
-	_, err := r.UpdateService(config.Metadata.Project, config.Metadata.Service)
+	_, err := r.UpdateService(config.Project, config.ServiceName)
 	assert.True(t, client.ServiceInvoked, "Service method was not called")
 	assert.NotNil(t, err)
 
@@ -361,7 +360,7 @@ func TestUpdateServiceFailed(t *testing.T) {
 	client.ServiceFn = func(name, serviceID string) (*run.Service, error) {
 		return nil, nil
 	}
-	_, err = r.UpdateService(config.Metadata.Project, config.Metadata.Service)
+	_, err = r.UpdateService(config.Project, config.ServiceName)
 	assert.True(t, client.ServiceInvoked, "Service method was not called")
 	assert.NotNil(t, err)
 }

@@ -4,12 +4,13 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/config"
+	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/service"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestNextCandidateTraffic100(t *testing.T) {
-	config := &config.Config{
-		Rollout: &config.Rollout{
+	config := &service.Config{
+		Strategy: &config.Strategy{
 			Steps: []int64{5, 30, 60},
 		},
 	}
