@@ -19,8 +19,8 @@ const (
 // A target might have the following form
 //
 // {
-// 	 "project": "myproject"
-//	 "regions": [us-east1, us-central1]
+//   "project": "myproject"
+//   "regions": [us-east1, us-central1]
 //   "selector": {
 //       "type": "labelSelector"
 //       "value": "team=backend"
@@ -31,8 +31,8 @@ const (
 // filtering by service name:
 //
 // {
-// 	 "project": "myproject"
-//	 "regions": [us-east1, us-central1]
+//   "project": "myproject"
+//   "regions": [us-east1, us-central1]
 //   "selector": {
 //       "type": "serviceName"
 //       "value": "mysvc"
