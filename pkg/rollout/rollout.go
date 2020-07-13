@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 
 	runapi "github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/run"
+	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/config"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/service"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -12,9 +13,10 @@ import (
 
 // Rollout is the rollout manager.
 type Rollout struct {
-	RunClient runapi.Client
-	Config    *service.Config
-	Log       *logrus.Entry
+	RunClient   runapi.Client
+	ServiceInfo *service.Service
+	Log         *logrus.Entry
+	Strategy    *config.Strategy
 
 	// Used to determine if candidate should become stable during update.
 	promoteToStable bool
@@ -28,28 +30,29 @@ const (
 )
 
 // New returns a new rollout manager.
-func New(client runapi.Client, config *service.Config) *Rollout {
+func New(client runapi.Client, svcInfo *service.Service, strategy *config.Strategy) *Rollout {
 	logger := logrus.New()
 	logger.SetOutput(ioutil.Discard)
 
 	return &Rollout{
-		RunClient: client,
-		Config:    config,
-		Log:       logger.WithField("project", config.Project),
+		RunClient:   client,
+		ServiceInfo: svcInfo,
+		Strategy:    strategy,
+		Log:         logger.WithField("project", svcInfo.Project),
 	}
 }
 
 // WithLogger updates the logger in the rollout instance.
 func (r *Rollout) WithLogger(logger *logrus.Logger) *Rollout {
-	r.Log = logger.WithField("project", r.Config.Project)
+	r.Log = logger.WithField("project", r.ServiceInfo.Project)
 	return r
 }
 
 // Rollout handles the gradual rollout.
 func (r *Rollout) Rollout() (bool, error) {
-	project := r.Config.Project
-	serviceID := r.Config.ServiceName
-	region := r.Config.Region
+	project := r.ServiceInfo.Project
+	serviceID := r.ServiceInfo.Name
+	region := r.ServiceInfo.Region
 
 	r.Log = r.Log.WithFields(logrus.Fields{
 		"project": project,
@@ -150,7 +153,7 @@ func (r *Rollout) newCandidateTraffic(svc *run.Service, candidate string) (*run.
 	var candidatePercent int64
 	candidateTarget := r.currentCandidateTraffic(svc, candidate)
 	if candidateTarget == nil {
-		candidatePercent = r.Config.Strategy.Steps[0]
+		candidatePercent = r.Strategy.Steps[0]
 	} else {
 		candidatePercent = r.nextCandidateTraffic(candidateTarget.Percent)
 
@@ -194,7 +197,7 @@ func (r *Rollout) currentCandidateTraffic(svc *run.Service, candidate string) *r
 
 // nextCandidateTraffic calculates the next traffic share for the candidate.
 func (r *Rollout) nextCandidateTraffic(current int64) int64 {
-	for _, step := range r.Config.Strategy.Steps {
+	for _, step := range r.Strategy.Steps {
 		if step > current {
 			return step
 		}

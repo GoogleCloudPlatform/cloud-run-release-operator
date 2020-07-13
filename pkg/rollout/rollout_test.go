@@ -35,12 +35,11 @@ func generateService(opts *ServiceOpts) *run.Service {
 
 func TestUpdateService(t *testing.T) {
 	client := &mock.RunAPI{}
-	config := &service.Config{
-		Project:     "test",
-		ServiceName: "hello",
-		Strategy: &config.Strategy{
-			Steps: []int64{10, 40, 70},
-		},
+	svcInfo := &service.Service{
+		Project: "test",
+	}
+	strategy := &config.Strategy{
+		Steps: []int64{10, 40, 70},
 	}
 
 	var tests = []struct {
@@ -67,8 +66,8 @@ func TestUpdateService(t *testing.T) {
 				rollout.CandidateRevisionAnnotation: "test-003",
 			},
 			outTraffic: []*run.TrafficTarget{
-				{RevisionName: "test-002", Percent: 100 - config.Strategy.Steps[0], Tag: rollout.StableTag},
-				{RevisionName: "test-003", Percent: config.Strategy.Steps[0], Tag: rollout.CandidateTag},
+				{RevisionName: "test-002", Percent: 100 - strategy.Steps[0], Tag: rollout.StableTag},
+				{RevisionName: "test-003", Percent: strategy.Steps[0], Tag: rollout.CandidateTag},
 				{LatestRevision: true, Tag: rollout.LatestTag},
 			},
 		},
@@ -108,8 +107,8 @@ func TestUpdateService(t *testing.T) {
 				rollout.CandidateRevisionAnnotation: "test-002",
 			},
 			outTraffic: []*run.TrafficTarget{
-				{RevisionName: "test-001", Percent: 100 - config.Strategy.Steps[0], Tag: rollout.StableTag},
-				{RevisionName: "test-002", Percent: config.Strategy.Steps[0], Tag: rollout.CandidateTag},
+				{RevisionName: "test-001", Percent: 100 - strategy.Steps[0], Tag: rollout.StableTag},
+				{RevisionName: "test-002", Percent: strategy.Steps[0], Tag: rollout.CandidateTag},
 				{LatestRevision: true, Tag: rollout.LatestTag},
 			},
 		},
@@ -117,8 +116,8 @@ func TestUpdateService(t *testing.T) {
 		{
 			name: "keep rolling out the same candidate",
 			traffic: []*run.TrafficTarget{
-				{RevisionName: "test-001", Percent: 100 - config.Strategy.Steps[1], Tag: rollout.StableTag},
-				{RevisionName: "test-002", Percent: config.Strategy.Steps[1], Tag: rollout.CandidateTag},
+				{RevisionName: "test-001", Percent: 100 - strategy.Steps[1], Tag: rollout.StableTag},
+				{RevisionName: "test-002", Percent: strategy.Steps[1], Tag: rollout.CandidateTag},
 				{LatestRevision: true, Tag: rollout.LatestTag},
 			},
 			lastReady: "test-002",
@@ -127,8 +126,8 @@ func TestUpdateService(t *testing.T) {
 				rollout.CandidateRevisionAnnotation: "test-002",
 			},
 			outTraffic: []*run.TrafficTarget{
-				{RevisionName: "test-001", Percent: 100 - config.Strategy.Steps[2], Tag: rollout.StableTag},
-				{RevisionName: "test-002", Percent: config.Strategy.Steps[2], Tag: rollout.CandidateTag},
+				{RevisionName: "test-001", Percent: 100 - strategy.Steps[2], Tag: rollout.StableTag},
+				{RevisionName: "test-002", Percent: strategy.Steps[2], Tag: rollout.CandidateTag},
 				{LatestRevision: true, Tag: rollout.LatestTag},
 			},
 		},
@@ -136,8 +135,8 @@ func TestUpdateService(t *testing.T) {
 		{
 			name: "different candidate, restart rollout",
 			traffic: []*run.TrafficTarget{
-				{RevisionName: "test-001", Percent: 100 - config.Strategy.Steps[2], Tag: rollout.StableTag},
-				{RevisionName: "test-002", Percent: config.Strategy.Steps[2], Tag: rollout.CandidateTag},
+				{RevisionName: "test-001", Percent: 100 - strategy.Steps[2], Tag: rollout.StableTag},
+				{RevisionName: "test-002", Percent: strategy.Steps[2], Tag: rollout.CandidateTag},
 				{LatestRevision: true, Tag: rollout.LatestTag},
 			},
 			lastReady: "test-003",
@@ -146,8 +145,8 @@ func TestUpdateService(t *testing.T) {
 				rollout.CandidateRevisionAnnotation: "test-003",
 			},
 			outTraffic: []*run.TrafficTarget{
-				{RevisionName: "test-001", Percent: 100 - config.Strategy.Steps[0], Tag: rollout.StableTag},
-				{RevisionName: "test-003", Percent: config.Strategy.Steps[0], Tag: rollout.CandidateTag},
+				{RevisionName: "test-001", Percent: 100 - strategy.Steps[0], Tag: rollout.StableTag},
+				{RevisionName: "test-003", Percent: strategy.Steps[0], Tag: rollout.CandidateTag},
 				{LatestRevision: true, Tag: rollout.LatestTag},
 			},
 		},
@@ -182,10 +181,10 @@ func TestUpdateService(t *testing.T) {
 			return svc, nil
 		}
 
-		r := rollout.New(client, config)
+		r := rollout.New(client, svcInfo, strategy)
 
 		t.Run(test.name, func(t *testing.T) {
-			svc, err := r.UpdateService(config.Project, config.ServiceName)
+			svc, err := r.UpdateService(svcInfo.Project, svcInfo.Name)
 			if test.shouldErr {
 				assert.NotNil(t, err)
 			} else if test.nilService {
@@ -201,12 +200,12 @@ func TestUpdateService(t *testing.T) {
 
 func TestSplitTraffic(t *testing.T) {
 	client := &mock.RunAPI{}
-	config := &service.Config{
-		Project:     "test",
-		ServiceName: "hello",
-		Strategy: &config.Strategy{
-			Steps: []int64{5, 30, 60},
-		},
+	svcInfo := &service.Service{
+		Project: "test",
+		Name:    "hello",
+	}
+	strategy := &config.Strategy{
+		Steps: []int64{5, 30, 60},
 	}
 
 	var tests = []struct {
@@ -317,7 +316,7 @@ func TestSplitTraffic(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		r := rollout.New(client, config)
+		r := rollout.New(client, svcInfo, strategy)
 
 		opts := &ServiceOpts{
 			Traffic: test.traffic,
@@ -337,21 +336,21 @@ func TestSplitTraffic(t *testing.T) {
 // TestUpdateServiceFailed tests Manage when retrieving information on a service fails.
 func TestUpdateServiceFailed(t *testing.T) {
 	client := &mock.RunAPI{}
-	config := &service.Config{
-		Project:     "test",
-		ServiceName: "hello",
-		Strategy: &config.Strategy{
-			Steps: []int64{10, 40, 70},
-		},
+	svcInfo := &service.Service{
+		Project: "test",
+		Name:    "hello",
 	}
-	r := rollout.New(client, config)
+	strategy := &config.Strategy{
+		Steps: []int64{10, 40, 70},
+	}
+	r := rollout.New(client, svcInfo, strategy)
 
 	// When retrieving service fails, an error should be returned.
 	client.ServiceInvoked = false
 	client.ServiceFn = func(name, serviceID string) (*run.Service, error) {
 		return nil, errors.New("bad request")
 	}
-	_, err := r.UpdateService(config.Project, config.ServiceName)
+	_, err := r.UpdateService(svcInfo.Project, svcInfo.Name)
 	assert.True(t, client.ServiceInvoked, "Service method was not called")
 	assert.NotNil(t, err)
 
@@ -360,7 +359,7 @@ func TestUpdateServiceFailed(t *testing.T) {
 	client.ServiceFn = func(name, serviceID string) (*run.Service, error) {
 		return nil, nil
 	}
-	_, err = r.UpdateService(config.Project, config.ServiceName)
+	_, err = r.UpdateService(svcInfo.Project, svcInfo.Name)
 	assert.True(t, client.ServiceInvoked, "Service method was not called")
 	assert.NotNil(t, err)
 }

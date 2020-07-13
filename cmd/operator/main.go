@@ -119,18 +119,17 @@ func main() {
 }
 
 func runCLI(logger *logrus.Logger, cfg *config.Config) {
-	serviceConfig := &service.Config{
-		Region:      flRegions[0],
-		Project:     cfg.Targets[0].Project,
-		ServiceName: "hello",
-		Strategy:    cfg.Strategy,
+	serviceInfo := &service.Service{
+		Region:  flRegions[0],
+		Project: cfg.Targets[0].Project,
+		Name:    "hello",
 	}
 
-	client, err := run.NewAPIClient(context.Background(), serviceConfig.Region)
+	client, err := run.NewAPIClient(context.Background(), serviceInfo.Region)
 	if err != nil {
 		logger.Fatalf("could not initilize Cloud Run client: %v", err)
 	}
-	roll := rollout.New(client, serviceConfig).WithLogger(logger)
+	roll := rollout.New(client, serviceInfo, cfg.Strategy).WithLogger(logger)
 
 	for {
 		changed, err := roll.Rollout()
@@ -141,7 +140,7 @@ func runCLI(logger *logrus.Logger, cfg *config.Config) {
 			logger.Info("Rollout process succeeded")
 		}
 
-		interval := time.Duration(serviceConfig.Strategy.Interval)
+		interval := time.Duration(cfg.Strategy.Interval)
 		time.Sleep(interval * time.Second)
 	}
 }
@@ -173,6 +172,12 @@ func flagsAreValid() (bool, error) {
 	}
 	if flLabel != "" && flService != "" {
 		return false, errors.New("only one of -label or -service can be used")
+	}
+
+	for _, region := range flRegions {
+		if region == "" {
+			return false, errors.New("region cannot be empty")
+		}
 	}
 
 	return true, nil
