@@ -37,6 +37,15 @@ const (
 	RequestCount     = "run.googleapis.com/request_count"
 )
 
+type alignReduce int32
+
+// Series aligner and cross series reducer types (for latency).
+const (
+	Align99Reduce99 alignReduce = 1
+	Align95Reduce95             = 2
+	Align50Reduce50             = 3
+)
+
 // NewAPIClient initializes
 func NewAPIClient(ctx context.Context, project string) (*API, error) {
 	client, err := monitoring.NewMetricClient(ctx)
@@ -51,9 +60,10 @@ func NewAPIClient(ctx context.Context, project string) (*API, error) {
 }
 
 // Latency returns the latency for the resource matching the filter.
-func (a *API) Latency(ctx context.Context, filter Filter, startTime time.Time) (float64, error) {
+func (a *API) Latency(ctx context.Context, filter Filter, startTime time.Time, alignReduceType alignReduce) (float64, error) {
 	filter = filter.Add("metric.type", RequestLatencies)
 	endTime := time.Now()
+	aligner, reducer := alignerAndReducer(alignReduceType)
 
 	it := a.Client.ListTimeSeries(ctx, &monitoringpb.ListTimeSeriesRequest{
 		Name:   "projects/" + a.Project,
@@ -64,9 +74,9 @@ func (a *API) Latency(ctx context.Context, filter Filter, startTime time.Time) (
 		},
 		Aggregation: &monitoringpb.Aggregation{
 			AlignmentPeriod:    duration.New(endTime.Sub(startTime)),
-			PerSeriesAligner:   monitoringpb.Aggregation_ALIGN_PERCENTILE_99,
+			PerSeriesAligner:   aligner,
 			GroupByFields:      []string{"metric.labels.response_code_class"},
-			CrossSeriesReducer: monitoringpb.Aggregation_REDUCE_PERCENTILE_99,
+			CrossSeriesReducer: reducer,
 		},
 	})
 
@@ -157,6 +167,25 @@ func calculateErrorResponseRate(it *monitoring.TimeSeriesIterator) (float64, err
 	rate := float64(errorResponseCount) / float64(totalResponses)
 
 	return rate, nil
+}
+
+func alignerAndReducer(alignReduceType alignReduce) (aligner monitoringpb.Aggregation_Aligner, reducer monitoringpb.Aggregation_Reducer) {
+	switch alignReduceType {
+	case Align99Reduce99:
+		aligner = monitoringpb.Aggregation_ALIGN_PERCENTILE_99
+		reducer = monitoringpb.Aggregation_REDUCE_PERCENTILE_99
+		break
+	case Align95Reduce95:
+		aligner = monitoringpb.Aggregation_ALIGN_PERCENTILE_95
+		reducer = monitoringpb.Aggregation_REDUCE_PERCENTILE_95
+		break
+	case Align50Reduce50:
+		aligner = monitoringpb.Aggregation_ALIGN_PERCENTILE_50
+		reducer = monitoringpb.Aggregation_REDUCE_PERCENTILE_50
+		break
+	}
+
+	return aligner, reducer
 }
 
 // NewFilter initializes a filter for a query.
