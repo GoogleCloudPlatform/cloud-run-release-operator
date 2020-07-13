@@ -7,7 +7,6 @@ import (
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/run/mock"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/config"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/rollout"
-	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/service"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
@@ -35,9 +34,6 @@ func generateService(opts *ServiceOpts) *run.Service {
 
 func TestUpdateService(t *testing.T) {
 	client := &mock.RunAPI{}
-	svcInfo := &service.Service{
-		Project: "test",
-	}
 	strategy := &config.Strategy{
 		Steps: []int64{10, 40, 70},
 	}
@@ -181,10 +177,10 @@ func TestUpdateService(t *testing.T) {
 			return svc, nil
 		}
 
-		r := rollout.New(client, svcInfo, strategy)
+		r := rollout.New(client, strategy)
 
 		t.Run(test.name, func(t *testing.T) {
-			svc, err := r.UpdateService(svcInfo.Project, svcInfo.Name)
+			svc, err := r.UpdateService("myproject", "mysvc")
 			if test.shouldErr {
 				assert.NotNil(t, err)
 			} else if test.nilService {
@@ -200,10 +196,6 @@ func TestUpdateService(t *testing.T) {
 
 func TestSplitTraffic(t *testing.T) {
 	client := &mock.RunAPI{}
-	svcInfo := &service.Service{
-		Project: "test",
-		Name:    "hello",
-	}
 	strategy := &config.Strategy{
 		Steps: []int64{5, 30, 60},
 	}
@@ -316,7 +308,7 @@ func TestSplitTraffic(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		r := rollout.New(client, svcInfo, strategy)
+		r := rollout.New(client, strategy)
 
 		opts := &ServiceOpts{
 			Traffic: test.traffic,
@@ -336,21 +328,17 @@ func TestSplitTraffic(t *testing.T) {
 // TestUpdateServiceFailed tests Manage when retrieving information on a service fails.
 func TestUpdateServiceFailed(t *testing.T) {
 	client := &mock.RunAPI{}
-	svcInfo := &service.Service{
-		Project: "test",
-		Name:    "hello",
-	}
 	strategy := &config.Strategy{
 		Steps: []int64{10, 40, 70},
 	}
-	r := rollout.New(client, svcInfo, strategy)
+	r := rollout.New(client, strategy)
 
 	// When retrieving service fails, an error should be returned.
 	client.ServiceInvoked = false
 	client.ServiceFn = func(name, serviceID string) (*run.Service, error) {
 		return nil, errors.New("bad request")
 	}
-	_, err := r.UpdateService(svcInfo.Project, svcInfo.Name)
+	_, err := r.UpdateService("myproject", "mysvc")
 	assert.True(t, client.ServiceInvoked, "Service method was not called")
 	assert.NotNil(t, err)
 
@@ -359,7 +347,7 @@ func TestUpdateServiceFailed(t *testing.T) {
 	client.ServiceFn = func(name, serviceID string) (*run.Service, error) {
 		return nil, nil
 	}
-	_, err = r.UpdateService(svcInfo.Project, svcInfo.Name)
+	_, err = r.UpdateService("myproject", "mysvc")
 	assert.True(t, client.ServiceInvoked, "Service method was not called")
 	assert.NotNil(t, err)
 }

@@ -5,7 +5,6 @@ import (
 
 	runapi "github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/run"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/config"
-	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/service"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/run/v1"
@@ -14,7 +13,9 @@ import (
 // Rollout is the rollout manager.
 type Rollout struct {
 	RunClient   runapi.Client
-	ServiceInfo *service.Service
+	Project     string
+	ServiceName string
+	Region      string
 	Log         *logrus.Entry
 	Strategy    *config.Strategy
 
@@ -30,29 +31,37 @@ const (
 )
 
 // New returns a new rollout manager.
-func New(client runapi.Client, svcInfo *service.Service, strategy *config.Strategy) *Rollout {
+func New(client runapi.Client, strategy *config.Strategy) *Rollout {
 	logger := logrus.New()
 	logger.SetOutput(ioutil.Discard)
 
 	return &Rollout{
-		RunClient:   client,
-		ServiceInfo: svcInfo,
-		Strategy:    strategy,
-		Log:         logger.WithField("project", svcInfo.Project),
+		RunClient: client,
+		Strategy:  strategy,
+		Log:       logger.WithField("project", ""),
 	}
+}
+
+// WithService sets information about the service to be rolled out.
+func (r *Rollout) WithService(project string, serviceName string, region string) *Rollout {
+	r.Project = project
+	r.ServiceName = serviceName
+	r.Region = region
+
+	return r
 }
 
 // WithLogger updates the logger in the rollout instance.
 func (r *Rollout) WithLogger(logger *logrus.Logger) *Rollout {
-	r.Log = logger.WithField("project", r.ServiceInfo.Project)
+	r.Log = logger.WithField("project", r.Project)
 	return r
 }
 
 // Rollout handles the gradual rollout.
 func (r *Rollout) Rollout() (bool, error) {
-	project := r.ServiceInfo.Project
-	serviceID := r.ServiceInfo.Name
-	region := r.ServiceInfo.Region
+	project := r.Project
+	serviceID := r.ServiceName
+	region := r.Region
 
 	r.Log = r.Log.WithFields(logrus.Fields{
 		"project": project,
