@@ -5,6 +5,7 @@ import (
 
 	runapi "github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/run"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/config"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/api/run/v1"
 )
 
@@ -31,7 +32,7 @@ func NewClient(runclient runapi.Client, svc *run.Service, project, serviceName, 
 }
 
 // Filter retrieves all the services that match the filter in the configuration.
-func Filter(cfg *config.Config) []*Client {
+func Filter(logger *logrus.Logger, cfg *config.Config) []*Client {
 	clientsCh := make(chan []*Client)
 	numberOfFilterByRegionCalls := 0
 	for _, target := range cfg.Targets {
@@ -41,7 +42,7 @@ func Filter(cfg *config.Config) []*Client {
 		}
 
 		for _, region := range regions {
-			go filterByRegion(clientsCh, target.Project, region, target.Selector)
+			go filterByRegion(clientsCh, logger, target.Project, region, target.Selector)
 			numberOfFilterByRegionCalls++
 		}
 	}
@@ -61,9 +62,17 @@ func Filter(cfg *config.Config) []*Client {
 
 // filterByRegion searches for a service name or label selector in an specific
 // regional endpoint.
-func filterByRegion(clientsCh chan []*Client, project, region string, selector config.TargetSelector) {
+func filterByRegion(clientsCh chan []*Client, logger *logrus.Logger, project, region string, selector config.TargetSelector) {
+	lg := logger.WithFields(logrus.Fields{
+		"project":  project,
+		"region":   region,
+		"selector": selector.Type,
+		"filter":   selector.Filter,
+	})
+
 	runclient, err := runapi.NewAPIClient(context.Background(), region)
 	if err != nil {
+		lg.Errorf("can not initialize Cloud Run client: %v", err)
 		clientsCh <- nil
 		return
 	}
@@ -71,7 +80,12 @@ func filterByRegion(clientsCh chan []*Client, project, region string, selector c
 	switch selector.Type {
 	case config.ServiceNameType:
 		svc, err := runclient.Service(project, selector.Filter)
-		if svc == nil || err != nil {
+		if err != nil {
+			lg.Errorf("failed to obtain information on service %q: %v", selector.Filter, err)
+			clientsCh <- nil
+			return
+		}
+		if svc == nil {
 			clientsCh <- nil
 			return
 		}
@@ -83,7 +97,12 @@ func filterByRegion(clientsCh chan []*Client, project, region string, selector c
 	case config.LabelSelectorType:
 		var clients []*Client
 		svcs, err := runclient.ListServices(project, selector.Filter)
-		if svcs == nil || err != nil {
+		if err != nil {
+			lg.Errorf("failed to filter services with label %q: %v", selector.Filter, err)
+			clientsCh <- nil
+			return
+		}
+		if svcs == nil {
 			clientsCh <- nil
 			return
 		}

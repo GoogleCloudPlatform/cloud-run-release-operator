@@ -118,7 +118,12 @@ func main() {
 
 func runCLI(logger *logrus.Logger, cfg *config.Config) {
 	for {
-		services := service.Filter(cfg)
+		services := service.Filter(logger, cfg)
+		if len(services) == 0 {
+			logger.Info("No service matches the targets")
+			interval := time.Duration(cfg.Strategy.Interval)
+			time.Sleep(interval * time.Second)
+		}
 		roll := rollout.New(services[0], cfg.Strategy).WithLogger(logger)
 
 		changed, err := roll.Rollout()
