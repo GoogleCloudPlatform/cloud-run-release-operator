@@ -9,7 +9,6 @@ import (
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/rollout"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/service"
 	"github.com/google/go-cmp/cmp"
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/api/run/v1"
 )
@@ -166,22 +165,19 @@ func TestUpdateService(t *testing.T) {
 	}
 
 	for _, test := range tests {
-
-		runclient.ServiceFn = func(namespaces, serviceID string) (*run.Service, error) {
-			opts := &ServiceOpts{
-				LatestReadyRevision: test.lastReady,
-				Traffic:             test.traffic,
-			}
-			return generateService(opts), nil
-		}
 		runclient.ReplaceServiceFn = func(namespace, serviceID string, svc *run.Service) (*run.Service, error) {
 			return svc, nil
 		}
 
 		r := rollout.New(&service.Client{RunClient: runclient}, strategy)
+		opts := &ServiceOpts{
+			LatestReadyRevision: test.lastReady,
+			Traffic:             test.traffic,
+		}
+		svc := generateService(opts)
 
 		t.Run(test.name, func(t *testing.T) {
-			svc, err := r.UpdateService("myproject", "mysvc")
+			svc, err := r.UpdateService(svc, "myproject", "mysvc")
 			if test.shouldErr {
 				assert.NotNil(t, err)
 			} else if test.nilService {
@@ -324,31 +320,4 @@ func TestSplitTraffic(t *testing.T) {
 			assert.True(t, cmp.Equal(test.expected, svc.Spec.Traffic))
 		})
 	}
-}
-
-// TestUpdateServiceFailed tests Manage when retrieving information on a service fails.
-func TestUpdateServiceFailed(t *testing.T) {
-	runclient := &mock.RunAPI{}
-	strategy := &config.Strategy{
-		Steps: []int64{10, 40, 70},
-	}
-	r := rollout.New(&service.Client{RunClient: runclient}, strategy)
-
-	// When retrieving service fails, an error should be returned.
-	runclient.ServiceInvoked = false
-	runclient.ServiceFn = func(name, serviceID string) (*run.Service, error) {
-		return nil, errors.New("bad request")
-	}
-	_, err := r.UpdateService("myproject", "mysvc")
-	assert.True(t, runclient.ServiceInvoked, "Service method was not called")
-	assert.NotNil(t, err)
-
-	// When Service returns nil, an error should be returned since service does not exist.
-	runclient.ServiceInvoked = false
-	runclient.ServiceFn = func(name, serviceID string) (*run.Service, error) {
-		return nil, nil
-	}
-	_, err = r.UpdateService("myproject", "mysvc")
-	assert.True(t, runclient.ServiceInvoked, "Service method was not called")
-	assert.NotNil(t, err)
 }

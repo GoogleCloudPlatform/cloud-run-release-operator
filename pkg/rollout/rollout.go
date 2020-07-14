@@ -14,6 +14,7 @@ import (
 // Rollout is the rollout manager.
 type Rollout struct {
 	RunClient   runapi.Client
+	Service     *run.Service
 	Project     string
 	ServiceName string
 	Region      string
@@ -38,6 +39,7 @@ func New(client *service.Client, strategy *config.Strategy) *Rollout {
 
 	return &Rollout{
 		RunClient:   client.RunClient,
+		Service:     client.Service,
 		Project:     client.Project,
 		ServiceName: client.ServiceName,
 		Region:      client.Region,
@@ -64,7 +66,7 @@ func (r *Rollout) Rollout() (bool, error) {
 		"region":  region,
 	})
 
-	svc, err := r.UpdateService(project, serviceID)
+	svc, err := r.UpdateService(r.Service, project, serviceID)
 	if err != nil {
 		return false, errors.Wrapf(err, "failed to perform rollout")
 	}
@@ -75,15 +77,7 @@ func (r *Rollout) Rollout() (bool, error) {
 
 // UpdateService changes the traffic configuration for the revisions and update
 // the service.
-func (r *Rollout) UpdateService(project, serviceID string) (*run.Service, error) {
-	svc, err := r.RunClient.Service(project, serviceID)
-	if err != nil {
-		return nil, errors.Wrapf(err, "could not get service %q", serviceID)
-	}
-	if svc == nil {
-		return nil, errors.Errorf("service %q does not exist", serviceID)
-	}
-
+func (r *Rollout) UpdateService(svc *run.Service, project, serviceID string) (*run.Service, error) {
 	stable := DetectStableRevisionName(svc)
 	if stable == "" {
 		r.Log.Info("Could not determine stable revision")
@@ -98,7 +92,7 @@ func (r *Rollout) UpdateService(project, serviceID string) (*run.Service, error)
 
 	svc = r.SplitTraffic(svc, stable, candidate)
 	svc = r.updateAnnotations(svc, stable, candidate)
-	svc, err = r.RunClient.ReplaceService(project, serviceID, svc)
+	svc, err := r.RunClient.ReplaceService(project, serviceID, svc)
 	if err != nil {
 		return nil, errors.Wrapf(err, "could not update service %q", serviceID)
 	}

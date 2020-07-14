@@ -21,6 +21,22 @@ type API struct {
 	Region string
 }
 
+// Regions are the available regions.
+var Regions = []string{
+	"asia-east1",
+	"asia-northeast1",
+	"asia-northeast2",
+	"europe-north1",
+	"europe-west1",
+	"europe-west4",
+	"us-central",
+	"us-east1",
+	"us-east4",
+	"us-west1",
+	"australia-southeast1",
+	"northamerica-northeast1",
+}
+
 // NewAPIClient initializes an instance of APIService.
 func NewAPIClient(ctx context.Context, region string) (*API, error) {
 	regionalEndpoint := fmt.Sprintf("https://%s-run.googleapis.com/", region)
@@ -45,6 +61,12 @@ func (a *API) Service(namespace, serviceID string) (*run.Service, error) {
 func (a *API) ReplaceService(namespace, serviceID string, svc *run.Service) (*run.Service, error) {
 	serviceName := serviceName(namespace, serviceID)
 	return a.Client.Namespaces.Services.ReplaceService(serviceName, svc).Do()
+}
+
+// ListServices gets services filtered by a label.
+func (a *API) ListServices(namespace string, labelSelector string) (*run.ListServicesResponse, error) {
+	parent := fmt.Sprintf("namespaces/%s", namespace)
+	return a.Client.Namespaces.Services.List(parent).LabelSelector(labelSelector).Do()
 }
 
 // generateServiceName returns the name of the specified service. It returns the

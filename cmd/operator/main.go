@@ -15,14 +15,12 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/run"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/config"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/rollout"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/service"
@@ -119,19 +117,10 @@ func main() {
 }
 
 func runCLI(logger *logrus.Logger, cfg *config.Config) {
-
-	runclient, err := run.NewAPIClient(context.Background(), flRegions[0])
-	if err != nil {
-		logger.Fatalf("could not initilize Cloud Run client: %v", err)
-	}
-	roll := rollout.New(&service.Client{
-		RunClient:   runclient,
-		Project:     cfg.Targets[0].Project,
-		ServiceName: "hello",
-		Region:      flRegions[0],
-	}, cfg.Strategy).WithLogger(logger)
-
 	for {
+		services := service.Filter(cfg)
+		roll := rollout.New(services[0], cfg.Strategy).WithLogger(logger)
+
 		changed, err := roll.Rollout()
 		if err != nil {
 			logger.Infof("Rollout failed: %v", err)
