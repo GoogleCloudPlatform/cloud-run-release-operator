@@ -27,8 +27,8 @@ type Query struct {
 
 // Metric types.
 const (
-	RequestLatencies = "run.googleapis.com/request_latencies"
-	RequestCount     = "run.googleapis.com/request_count"
+	requestLatencies = "run.googleapis.com/request_latencies"
+	requestCount     = "run.googleapis.com/request_count"
 )
 
 // NewAPIClient initializes
@@ -46,7 +46,7 @@ func NewAPIClient(ctx context.Context, project string) (*API, error) {
 
 // Latency returns the latency for the resource matching the filter.
 func (a *API) Latency(ctx context.Context, query metrics.Query, startTime time.Time, alignReduceType metrics.AlignReduce) (float64, error) {
-	query.Filter("metric.type", RequestLatencies)
+	query = addFilterToQuery(query, "metric.type", requestLatencies)
 	endTime := time.Now()
 	aligner, reducer := alignerAndReducer(alignReduceType)
 
@@ -68,10 +68,9 @@ func (a *API) Latency(ctx context.Context, query metrics.Query, startTime time.T
 	return latencyForCodeClass(it, "2xx")
 }
 
-// ServerErrorRate returns the rate of 5xx errors for the resource matching the
-// filter.
-func (a *API) ServerErrorRate(ctx context.Context, query metrics.Query, startTime time.Time) (float64, error) {
-	query.Filter("metric.type", RequestCount)
+// ErrorRate returns the rate of 5xx errors for the resource matching the filter.
+func (a *API) ErrorRate(ctx context.Context, query metrics.Query, startTime time.Time) (float64, error) {
+	query = addFilterToQuery(query, "metric.type", requestCount)
 	endTime := time.Now()
 
 	it := a.MetricClient.ListTimeSeries(ctx, &monitoringpb.ListTimeSeriesRequest{
@@ -135,11 +134,11 @@ func calculateErrorResponseRate(it *monitoring.TimeSeriesIterator) (float64, err
 		// Because the interval and the series aligner are the same, only one
 		// point is returned per time series.
 		switch series.Metric.Labels["response_code_class"] {
-		case "2xx":
-			successfulResponseCount += series.Points[0].Value.GetInt64Value()
-			break
 		case "5xx":
 			errorResponseCount += series.Points[0].Value.GetInt64Value()
+			break
+		default:
+			successfulResponseCount += series.Points[0].Value.GetInt64Value()
 			break
 		}
 	}
@@ -174,23 +173,30 @@ func alignerAndReducer(alignReduceType metrics.AlignReduce) (aligner monitoringp
 }
 
 // NewQuery initializes a query.
-func NewQuery(serviceName, revisionName string) Query {
-	query := Query{}
-	query.Filter("resource.labels.service_name", serviceName)
-	query.Filter("resource.labels.revision_name", revisionName)
-
-	return query
-}
-
-// Filter adds a filter for the query.
-func (q *Query) Filter(key, value string) {
-	if q.filter != "" {
-		q.filter += " AND "
-	}
-	q.filter += fmt.Sprintf("%s=%q", key, value)
+func NewQuery(project, region, serviceName, revisionName string) Query {
+	return Query{}.addFilter("resource.labels.project_id", project).
+		addFilter("resource.labels.location", region).
+		addFilter("resource.labels.service_name", serviceName).
+		addFilter("resource.labels.revision_name", revisionName)
 }
 
 // Query returns the string representation of the query.
 func (q Query) Query() string {
 	return q.filter
+}
+
+// addFilter adds a filter to the query.
+func (q Query) addFilter(key, value string) Query {
+	if q.filter != "" {
+		q.filter += " AND "
+	}
+	q.filter += fmt.Sprintf("%s=%q", key, value)
+
+	return q
+}
+
+func addFilterToQuery(query metrics.Query, key, value string) Query {
+	q := query.(Query)
+
+	return q.addFilter(key, value)
 }

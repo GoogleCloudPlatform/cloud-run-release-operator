@@ -7,7 +7,6 @@ import (
 
 // Query is the filter used to retrieve metrics data.
 type Query interface {
-	Filter(key, value string)
 	Query() string
 }
 
@@ -22,8 +21,14 @@ const (
 	Align50Reduce50             = 3
 )
 
-// Client represents a wrapper around the Cloud Monitoring package.
-type Client interface {
+// Metrics represents a monitoring API such as Stackdriver.
+//
+// Latency returns the request latency after applying the specified series
+// aligner and cross series reducer. The result is in milliseconds.
+//
+// Error rate gets all the server responses. It calculates the error rate by
+// performing the operation (5xx responses / all responses).
+type Metrics interface {
 	Latency(ctx context.Context, query Query, startTime time.Time, alignReduceType AlignReduce) (float64, error)
-	ServerErrorRate(ctx context.Context, query Query, startTime time.Time) (float64, error)
+	ErrorRate(ctx context.Context, query Query, startTime time.Time) (float64, error)
 }
