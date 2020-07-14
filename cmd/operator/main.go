@@ -15,7 +15,6 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"log"
 	"os"
@@ -23,7 +22,10 @@ import (
 	"strings"
 	"time"
 
+<<<<<<< HEAD
 	runapi "github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/run"
+=======
+>>>>>>> service: Filter several services using config
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/config"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/rollout"
 	stackdriver "github.com/TV4/logrus-stackdriver-formatter"
