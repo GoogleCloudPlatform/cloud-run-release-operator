@@ -21,21 +21,8 @@ type API struct {
 	Region string
 }
 
-// Regions are the available regions.
-var Regions = []string{
-	"asia-east1",
-	"asia-northeast1",
-	"asia-northeast2",
-	"europe-north1",
-	"europe-west1",
-	"europe-west4",
-	"us-central",
-	"us-east1",
-	"us-east4",
-	"us-west1",
-	"australia-southeast1",
-	"northamerica-northeast1",
-}
+// regions are the available regions.
+var regions = []string{}
 
 // NewAPIClient initializes an instance of APIService.
 func NewAPIClient(ctx context.Context, region string) (*API, error) {
@@ -67,6 +54,28 @@ func (a *API) ReplaceService(namespace, serviceID string, svc *run.Service) (*ru
 func (a *API) ListServices(namespace string, labelSelector string) (*run.ListServicesResponse, error) {
 	parent := fmt.Sprintf("namespaces/%s", namespace)
 	return a.Client.Namespaces.Services.List(parent).LabelSelector(labelSelector).Do()
+}
+
+// Locations gets the supported locations for the project.
+func Locations(project string) ([]string, error) {
+	if len(regions) == 0 {
+		client, err := run.NewService(context.Background())
+		if err != nil {
+			return nil, errors.Wrap(err, "could not initialize client for the Cloud Run API")
+		}
+
+		name := fmt.Sprintf("projects/%s", project)
+		resp, err := client.Projects.Locations.List(name).Do()
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get locations")
+		}
+
+		for _, location := range resp.Locations {
+			regions = append(regions, location.LocationId)
+		}
+	}
+
+	return regions, nil
 }
 
 // generateServiceName returns the name of the specified service. It returns the

@@ -37,8 +37,15 @@ func Filter(logger *logrus.Logger, cfg *config.Config) []*Client {
 	numberOfFilterByRegionCalls := 0
 	for _, target := range cfg.Targets {
 		regions := target.Regions
+
+		// If regions are not specified in configuration, query all regions.
 		if len(target.Regions) == 0 {
-			regions = runapi.Regions
+			var err error
+			regions, err = runapi.Locations(target.Project)
+			if err != nil {
+				logger.Errorf("Cannot get all regions: %v", err)
+				continue
+			}
 		}
 
 		for _, region := range regions {
@@ -64,10 +71,10 @@ func Filter(logger *logrus.Logger, cfg *config.Config) []*Client {
 // regional endpoint.
 func filterByRegion(clientsCh chan []*Client, logger *logrus.Logger, project, region string, selector config.TargetSelector) {
 	lg := logger.WithFields(logrus.Fields{
-		"project":  project,
-		"region":   region,
-		"selector": selector.Type,
-		"filter":   selector.Filter,
+		"project":        project,
+		"region":         region,
+		"selectorType":   selector.Type,
+		"selectorFilter": selector.Filter,
 	})
 
 	runclient, err := runapi.NewAPIClient(context.Background(), region)
