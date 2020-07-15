@@ -7,13 +7,13 @@ import (
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/run/mock"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/config"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/rollout"
-	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/service"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/api/run/v1"
 )
 
 type ServiceOpts struct {
+	Name                  string
 	LatestReadyRevision   string
 	LatestCreatedRevision string
 	Traffic               []*run.TrafficTarget
@@ -21,7 +21,9 @@ type ServiceOpts struct {
 
 func generateService(opts *ServiceOpts) *run.Service {
 	return &run.Service{
-		Metadata: &run.ObjectMeta{},
+		Metadata: &run.ObjectMeta{
+			Name: opts.Name,
+		},
 		Spec: &run.ServiceSpec{
 			Traffic: opts.Traffic,
 		},
@@ -169,15 +171,18 @@ func TestUpdateService(t *testing.T) {
 			return svc, nil
 		}
 
-		r := rollout.New(&service.Client{RunClient: runclient}, strategy)
 		opts := &ServiceOpts{
+			Name:                "mysvc",
 			LatestReadyRevision: test.lastReady,
 			Traffic:             test.traffic,
 		}
 		svc := generateService(opts)
+		svcRecord := &rollout.ServiceRecord{Service: svc}
+
+		r := rollout.New(runclient, svcRecord, strategy)
 
 		t.Run(test.name, func(t *testing.T) {
-			svc, err := r.UpdateService(svc, "myproject", "mysvc")
+			svc, err := r.UpdateService(svc)
 			if test.shouldErr {
 				assert.NotNil(t, err)
 			} else if test.nilService {
@@ -305,12 +310,13 @@ func TestSplitTraffic(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		r := rollout.New(&service.Client{RunClient: runclient}, strategy)
-
 		opts := &ServiceOpts{
 			Traffic: test.traffic,
 		}
 		svc := generateService(opts)
+		svcRecord := &rollout.ServiceRecord{Service: svc}
+
+		r := rollout.New(runclient, svcRecord, strategy)
 
 		t.Run(test.name, func(t *testing.T) {
 			svc = r.SplitTraffic(svc, test.stable, test.candidate)

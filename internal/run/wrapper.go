@@ -50,14 +50,24 @@ func (a *API) ReplaceService(namespace, serviceID string, svc *run.Service) (*ru
 	return a.Client.Namespaces.Services.ReplaceService(serviceName, svc).Do()
 }
 
-// ListServices gets services filtered by a label.
-func (a *API) ListServices(namespace string, labelSelector string) (*run.ListServicesResponse, error) {
+// ServicesWithLabelSelector gets services filtered by a label selector.
+func (a *API) ServicesWithLabelSelector(namespace string, labelSelector string) ([]*run.Service, error) {
 	parent := fmt.Sprintf("namespaces/%s", namespace)
-	return a.Client.Namespaces.Services.List(parent).LabelSelector(labelSelector).Do()
+
+	servicesList, err := a.Client.Namespaces.Services.List(parent).LabelSelector(labelSelector).Do()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to filter services by label selector")
+	}
+
+	var services []*run.Service
+	for _, service := range servicesList.Items {
+		services = append(services, service)
+	}
+	return services, nil
 }
 
-// Locations gets the supported locations for the project.
-func Locations(project string) ([]string, error) {
+// Regions gets the supported regions for the project.
+func Regions(project string) ([]string, error) {
 	if len(regions) == 0 {
 		client, err := run.NewService(context.Background())
 		if err != nil {

@@ -17,7 +17,9 @@ type Target struct {
 
 // Strategy is the steps and configuration for rollout.
 type Strategy struct {
-	Steps    []int64
+	Steps []int64
+
+	// TODO: Give this property a clearer name.
 	Interval int64
 }
 
