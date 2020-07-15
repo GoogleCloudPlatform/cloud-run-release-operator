@@ -14,9 +14,12 @@ import (
 // getTargetedServices returned a list of service records that match the target
 // configuration.
 func getTargetedServices(ctx context.Context, logger *logrus.Logger, targets []*config.Target) ([]*rollout.ServiceRecord, error) {
+<<<<<<< HEAD
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+=======
+>>>>>>> Use wait groups to retrieve services
 	var (
 		retServices []*rollout.ServiceRecord
 		retError    error
@@ -32,6 +35,10 @@ func getTargetedServices(ctx context.Context, logger *logrus.Logger, targets []*
 		}
 
 		for _, region := range regions {
+<<<<<<< HEAD
+=======
+			ctx, cancel := context.WithCancel(ctx)
+>>>>>>> Use wait groups to retrieve services
 			wg.Add(1)
 
 			go func(region, labelSelector string) {
@@ -86,7 +93,11 @@ func getRegions(target *config.Target) ([]string, error) {
 		var err error
 		regions, err = runapi.Regions(target.Project)
 		if err != nil {
+<<<<<<< HEAD
 			return nil, errors.Wrap(err, "cannot get list of regions from Cloud Run API")
+=======
+			return nil, errors.Wrap(err, "Cannot get list of regions from Cloud Run API")
+>>>>>>> Use wait groups to retrieve services
 		}
 	}
 

@@ -15,6 +15,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"log"
 	"os"
@@ -23,9 +24,13 @@ import (
 	"time"
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 	runapi "github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/run"
 =======
 >>>>>>> service: Filter several services using config
+=======
+	runapi "github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/run"
+>>>>>>> Use wait groups to retrieve services
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/config"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/rollout"
 	stackdriver "github.com/TV4/logrus-stackdriver-formatter"

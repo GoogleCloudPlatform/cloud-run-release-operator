@@ -88,28 +88,6 @@ func Regions(project string) ([]string, error) {
 	return regions, nil
 }
 
-// Locations gets the supported locations for the project.
-func Locations(project string) ([]string, error) {
-	if len(regions) == 0 {
-		client, err := run.NewService(context.Background())
-		if err != nil {
-			return nil, errors.Wrap(err, "could not initialize client for the Cloud Run API")
-		}
-
-		name := fmt.Sprintf("projects/%s", project)
-		resp, err := client.Projects.Locations.List(name).Do()
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to get locations")
-		}
-
-		for _, location := range resp.Locations {
-			regions = append(regions, location.LocationId)
-		}
-	}
-
-	return regions, nil
-}
-
 // generateServiceName returns the name of the specified service. It returns the
 // form namespaces/{namespace_id}/services/{service_id}.
 //
