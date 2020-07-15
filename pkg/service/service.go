@@ -49,7 +49,7 @@ func Filter(logger *logrus.Logger, cfg *config.Config) []*Client {
 		}
 
 		for _, region := range regions {
-			go filterByRegion(clientsCh, logger, target.Project, region, target.Selector)
+			go filterByRegion(clientsCh, logger, target.Project, region, target.LabelSelector)
 			numberOfFilterByRegionCalls++
 		}
 	}
@@ -69,12 +69,11 @@ func Filter(logger *logrus.Logger, cfg *config.Config) []*Client {
 
 // filterByRegion searches for a service name or label selector in an specific
 // regional endpoint.
-func filterByRegion(clientsCh chan []*Client, logger *logrus.Logger, project, region string, selector config.TargetSelector) {
+func filterByRegion(clientsCh chan []*Client, logger *logrus.Logger, project, region string, labelSelector string) {
 	lg := logger.WithFields(logrus.Fields{
-		"project":        project,
-		"region":         region,
-		"selectorType":   selector.Type,
-		"selectorFilter": selector.Filter,
+		"project":       project,
+		"region":        region,
+		"labelSelector": labelSelector,
 	})
 
 	runclient, err := runapi.NewAPIClient(context.Background(), region)
@@ -84,42 +83,21 @@ func filterByRegion(clientsCh chan []*Client, logger *logrus.Logger, project, re
 		return
 	}
 
-	switch selector.Type {
-	case config.ServiceNameType:
-		svc, err := runclient.Service(project, selector.Filter)
-		if err != nil {
-			lg.Errorf("failed to obtain information on service %q: %v", selector.Filter, err)
-			clientsCh <- nil
-			return
-		}
-		if svc == nil {
-			clientsCh <- nil
-			return
-		}
-
-		clientsCh <- []*Client{
-			NewClient(runclient, svc, project, svc.Metadata.Name, region),
-		}
-		break
-	case config.LabelSelectorType:
-		var clients []*Client
-		svcs, err := runclient.ListServices(project, selector.Filter)
-		if err != nil {
-			lg.Errorf("failed to filter services with label %q: %v", selector.Filter, err)
-			clientsCh <- nil
-			return
-		}
-		if svcs == nil {
-			clientsCh <- nil
-			return
-		}
-
-		for _, svc := range svcs.Items {
-			client := NewClient(runclient, svc, project, svc.Metadata.Name, region)
-			clients = append(clients, client)
-		}
-		clientsCh <- clients
-	default:
+	var clients []*Client
+	svcs, err := runclient.ListServices(project, labelSelector)
+	if err != nil {
+		lg.Errorf("failed to filter services with label %q: %v", labelSelector, err)
 		clientsCh <- nil
+		return
 	}
+	if svcs == nil {
+		clientsCh <- nil
+		return
+	}
+
+	for _, svc := range svcs.Items {
+		client := NewClient(runclient, svc, project, svc.Metadata.Name, region)
+		clients = append(clients, client)
+	}
+	clientsCh <- clients
 }
