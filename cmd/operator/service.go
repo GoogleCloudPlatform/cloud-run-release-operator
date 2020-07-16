@@ -9,6 +9,7 @@ import (
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/rollout"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"google.golang.org/api/run/v1"
 )
 
 // getTargetedServices returned a list of service records that match the target
@@ -25,16 +26,16 @@ func getTargetedServices(ctx context.Context, logger *logrus.Logger, targets []*
 	)
 
 	for _, target := range targets {
-		regions, err := getRegions(target)
+		regions, err := determineRegions(target)
 		if err != nil {
-			logger.Errorf("Cannot get all regions: %v", err)
+			logger.Errorf("Cannot determine regions: %v", err)
 			continue
 		}
 
 		for _, region := range regions {
 			wg.Add(1)
 
-			go func(region, labelSelector string) {
+			go func(ctx context.Context, region, labelSelector string) {
 				defer wg.Done()
 				svcs, err := getServicesByRegionAndLabel(ctx, target.Project, region, target.LabelSelector)
 				if err != nil {
@@ -43,11 +44,13 @@ func getTargetedServices(ctx context.Context, logger *logrus.Logger, targets []*
 					return
 				}
 
-				mu.Lock()
-				retServices = append(retServices, svcs...)
-				mu.Unlock()
+				for _, svc := range svcs {
+					mu.Lock()
+					retServices = append(retServices, newServiceRecord(svc, target.Project, region))
+					mu.Unlock()
+				}
 
-			}(region, target.LabelSelector)
+			}(ctx, region, target.LabelSelector)
 		}
 	}
 
@@ -57,7 +60,7 @@ func getTargetedServices(ctx context.Context, logger *logrus.Logger, targets []*
 
 // getServicesByRegionAndLabel returns all the service records that match the
 // labelSelector in a specific region.
-func getServicesByRegionAndLabel(ctx context.Context, project, region, labelSelector string) ([]*rollout.ServiceRecord, error) {
+func getServicesByRegionAndLabel(ctx context.Context, project, region, labelSelector string) ([]*run.Service, error) {
 	runclient, err := runapi.NewAPIClient(ctx, region)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to initialize Cloud Run client")
@@ -68,27 +71,31 @@ func getServicesByRegionAndLabel(ctx context.Context, project, region, labelSele
 		return nil, errors.Wrapf(err, "failed to get services with label %q in region %q", labelSelector, region)
 	}
 
-	var records []*rollout.ServiceRecord
-	for _, svc := range svcs {
-		records = append(records, &rollout.ServiceRecord{
-			Service: svc,
-			Project: project,
-			Region:  region,
-		})
-	}
-
-	return records, nil
+	return svcs, nil
 }
 
-func getRegions(target *config.Target) ([]string, error) {
+// determineRegions gets the regions the label selector should be searched at.
+//
+// If the target configuration does not specify any regions, the entire list of
+// regions is retrieved from API.
+func determineRegions(target *config.Target) ([]string, error) {
 	regions := target.Regions
-	if len(regions) == 0 {
-		var err error
-		regions, err = runapi.Regions(target.Project)
-		if err != nil {
-			return nil, errors.Wrap(err, "cannot get list of regions from Cloud Run API")
-		}
+	if len(regions) != 0 {
+		return regions, nil
 	}
 
+	regions, err := runapi.Regions(target.Project)
+	if err != nil {
+		return nil, errors.Wrap(err, "Cannot get list of regions from Cloud Run API")
+	}
 	return regions, nil
+}
+
+// newServiceRecord creates a new service record.
+func newServiceRecord(svc *run.Service, project, region string) *rollout.ServiceRecord {
+	return &rollout.ServiceRecord{
+		Service: svc,
+		Project: project,
+		Region:  region,
+	}
 }

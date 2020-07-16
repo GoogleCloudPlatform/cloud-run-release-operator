@@ -59,32 +59,29 @@ func (a *API) ServicesWithLabelSelector(namespace string, labelSelector string) 
 		return nil, errors.Wrap(err, "failed to filter services by label selector")
 	}
 
-	var services []*run.Service
-	for _, service := range servicesList.Items {
-		services = append(services, service)
-	}
-	return services, nil
+	return servicesList.Items, nil
 }
 
 // Regions gets the supported regions for the project.
 func Regions(project string) ([]string, error) {
-	if len(regions) == 0 {
-		client, err := run.NewService(context.Background())
-		if err != nil {
-			return nil, errors.Wrap(err, "could not initialize client for the Cloud Run API")
-		}
-
-		name := fmt.Sprintf("projects/%s", project)
-		resp, err := client.Projects.Locations.List(name).Do()
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to get locations")
-		}
-
-		for _, location := range resp.Locations {
-			regions = append(regions, location.LocationId)
-		}
+	if len(regions) != 0 {
+		return regions, nil
 	}
 
+	client, err := run.NewService(context.Background())
+	if err != nil {
+		return nil, errors.Wrap(err, "could not initialize client for the Cloud Run API")
+	}
+
+	name := fmt.Sprintf("projects/%s", project)
+	resp, err := client.Projects.Locations.List(name).Do()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get locations")
+	}
+
+	for _, location := range resp.Locations {
+		regions = append(regions, location.LocationId)
+	}
 	return regions, nil
 }
 
