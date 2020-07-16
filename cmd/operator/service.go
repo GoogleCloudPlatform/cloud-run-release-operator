@@ -14,6 +14,9 @@ import (
 // getTargetedServices returned a list of service records that match the target
 // configuration.
 func getTargetedServices(ctx context.Context, logger *logrus.Logger, targets []*config.Target) ([]*rollout.ServiceRecord, error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	var (
 		retServices []*rollout.ServiceRecord
 		retError    error
@@ -29,7 +32,6 @@ func getTargetedServices(ctx context.Context, logger *logrus.Logger, targets []*
 		}
 
 		for _, region := range regions {
-			ctx, cancel := context.WithCancel(ctx)
 			wg.Add(1)
 
 			go func(region, labelSelector string) {
