@@ -29,6 +29,6 @@ const (
 // Error rate gets all the server responses. It calculates the error rate by
 // performing the operation (5xx responses / all responses).
 type Metrics interface {
-	Latency(ctx context.Context, query Query, startTime time.Time, alignReduceType AlignReduce) (float64, error)
-	ErrorRate(ctx context.Context, query Query, startTime time.Time) (float64, error)
+	Latency(ctx context.Context, query Query, offset time.Duration, alignReduceType AlignReduce) (float64, error)
+	ErrorRate(ctx context.Context, query Query, offset time.Duration) (float64, error)
 }

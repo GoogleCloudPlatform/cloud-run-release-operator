@@ -45,9 +45,10 @@ func NewAPIClient(ctx context.Context, project string) (*API, error) {
 }
 
 // Latency returns the latency for the resource matching the filter.
-func (a *API) Latency(ctx context.Context, query metrics.Query, startTime time.Time, alignReduceType metrics.AlignReduce) (float64, error) {
+func (a *API) Latency(ctx context.Context, query metrics.Query, offset time.Duration, alignReduceType metrics.AlignReduce) (float64, error) {
 	query = addFilterToQuery(query, "metric.type", requestLatencies)
 	endTime := time.Now()
+	startTime := time.Now().Add(-1 * offset)
 	aligner, reducer := alignerAndReducer(alignReduceType)
 
 	it := a.MetricClient.ListTimeSeries(ctx, &monitoringpb.ListTimeSeriesRequest{
@@ -58,7 +59,7 @@ func (a *API) Latency(ctx context.Context, query metrics.Query, startTime time.T
 			EndTime:   timestamp.New(endTime),
 		},
 		Aggregation: &monitoringpb.Aggregation{
-			AlignmentPeriod:    duration.New(endTime.Sub(startTime)),
+			AlignmentPeriod:    duration.New(offset),
 			PerSeriesAligner:   aligner,
 			GroupByFields:      []string{"metric.labels.response_code_class"},
 			CrossSeriesReducer: reducer,
@@ -69,9 +70,10 @@ func (a *API) Latency(ctx context.Context, query metrics.Query, startTime time.T
 }
 
 // ErrorRate returns the rate of 5xx errors for the resource matching the filter.
-func (a *API) ErrorRate(ctx context.Context, query metrics.Query, startTime time.Time) (float64, error) {
+func (a *API) ErrorRate(ctx context.Context, query metrics.Query, offset time.Duration) (float64, error) {
 	query = addFilterToQuery(query, "metric.type", requestCount)
 	endTime := time.Now()
+	startTime := time.Now().Add(-1 * offset)
 
 	it := a.MetricClient.ListTimeSeries(ctx, &monitoringpb.ListTimeSeriesRequest{
 		Name:   "projects/" + a.Project,
@@ -81,7 +83,7 @@ func (a *API) ErrorRate(ctx context.Context, query metrics.Query, startTime time
 			EndTime:   timestamp.New(endTime),
 		},
 		Aggregation: &monitoringpb.Aggregation{
-			AlignmentPeriod:    duration.New(endTime.Sub(startTime)),
+			AlignmentPeriod:    duration.New(offset),
 			PerSeriesAligner:   monitoringpb.Aggregation_ALIGN_DELTA,
 			GroupByFields:      []string{"metric.labels.response_code_class"},
 			CrossSeriesReducer: monitoringpb.Aggregation_REDUCE_SUM,
