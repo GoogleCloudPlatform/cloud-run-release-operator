@@ -86,7 +86,7 @@ func getRegions(target *config.Target) ([]string, error) {
 		var err error
 		regions, err = runapi.Regions(target.Project)
 		if err != nil {
-			return nil, errors.Wrap(err, "Cannot get list of regions from Cloud Run API")
+			return nil, errors.Wrap(err, "cannot get list of regions from Cloud Run API")
 		}
 	}
 
