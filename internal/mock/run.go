@@ -12,13 +12,13 @@ type Run struct {
 }
 
 // Service invokes the mock implementation and marks the function as invoked.
-func (a *Run) Service(namespace, service string) (*run.Service, error) {
-	a.ServiceInvoked = true
-	return a.ServiceFn(namespace, service)
+func (r *Run) Service(namespace, service string) (*run.Service, error) {
+	r.ServiceInvoked = true
+	return r.ServiceFn(namespace, service)
 }
 
 // ReplaceService invokes the mock implementation and marks the function as invoked.
-func (a *Run) ReplaceService(namespace, serviceID string, svc *run.Service) (*run.Service, error) {
-	a.ReplaceServiceInvoked = true
-	return a.ReplaceServiceFn(namespace, serviceID, svc)
+func (r *Run) ReplaceService(namespace, serviceID string, svc *run.Service) (*run.Service, error) {
+	r.ReplaceServiceInvoked = true
+	return r.ReplaceServiceFn(namespace, serviceID, svc)
 }
