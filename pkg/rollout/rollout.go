@@ -114,7 +114,7 @@ func (r *Rollout) SplitTraffic(svc *run.Service, stable, candidate string) *run.
 	r.log.WithFields(logrus.Fields{
 		"stable":    stable,
 		"candidate": candidate,
-	}).Debugf("splitting traffic", stable, candidate)
+	}).Debug("splitting traffic", stable, candidate)
 
 	var traffic []*run.TrafficTarget
 	var stablePercent int64
