@@ -8,13 +8,12 @@ import (
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/config"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/rollout"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"google.golang.org/api/run/v1"
 )
 
 // getTargetedServices returned a list of service records that match the target
 // configuration.
-func getTargetedServices(ctx context.Context, logger *logrus.Logger, targets []*config.Target) ([]*rollout.ServiceRecord, error) {
+func getTargetedServices(ctx context.Context, targets []*config.Target) ([]*rollout.ServiceRecord, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -28,8 +27,7 @@ func getTargetedServices(ctx context.Context, logger *logrus.Logger, targets []*
 	for _, target := range targets {
 		regions, err := determineRegions(target)
 		if err != nil {
-			logger.Errorf("Cannot determine regions: %v", err)
-			continue
+			return nil, errors.Wrap(err, "cannot determine regions")
 		}
 
 		for _, region := range regions {

@@ -111,7 +111,7 @@ func main() {
 
 func runCLI(logger *logrus.Logger, cfg *config.Config) {
 	for {
-		services, err := getTargetedServices(context.Background(), logger, cfg.Targets)
+		services, err := getTargetedServices(context.Background(), cfg.Targets)
 		if err != nil {
 			log.Fatalf("failed to get targeted services %v", err)
 		}
