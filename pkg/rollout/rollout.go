@@ -215,7 +215,6 @@ func (r *Rollout) nextCandidateTraffic(current int64) int64 {
 
 // updateAnnotations updates the annotations to keep some state about the rollout.
 func (r *Rollout) updateAnnotations(svc *run.Service, stable, candidate string) *run.Service {
-	r.log.Debug("including annotations for the service")
 	if svc.Metadata.Annotations == nil {
 		svc.Metadata.Annotations = make(map[string]string)
 	}
