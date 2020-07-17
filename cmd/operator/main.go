@@ -138,10 +138,10 @@ func runCLI(logger *logrus.Logger, cfg *config.Config) {
 
 		changed, err := roll.Rollout()
 		if err != nil {
-			logger.Fatalf("Rollout failed: %v", err)
+			logger.Infof("rollout failed: %v", err)
 		}
 		if changed {
-			logger.Info("Rollout process succeeded")
+			logger.Info("rollout process succeeded")
 		}
 
 		duration := time.Duration(cfg.Strategy.Interval)
