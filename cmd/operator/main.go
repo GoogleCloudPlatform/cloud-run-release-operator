@@ -53,10 +53,17 @@ func (steps stepFlags) String() string {
 }
 
 var (
+	logrusLevel    logrus.Level
+	flLoggingLevel string
+
 	flCLI           bool
 	flHTTPAddr      string
 	flProject       string
 	flLabelSelector string
+
+	// Either service or label selection needed.
+	flService string
+	flLabel   string
 
 	// Empty array means all regions.
 	flRegions       []string
@@ -69,6 +76,7 @@ var (
 )
 
 func init() {
+	flag.StringVar(&flLoggingLevel, "verbosity", "info", "the logging level (e.g. debug)")
 	flag.BoolVar(&flCLI, "cli", false, "run as CLI application to manage rollout in intervals")
 	flag.StringVar(&flHTTPAddr, "http-addr", "", "listen on http portrun on request (e.g. :8080)")
 	flag.StringVar(&flProject, "project", "", "project in which the service is deployed")
@@ -90,6 +98,8 @@ func main() {
 	if !valid {
 		logger.Fatalf("invalid flags: %v", err)
 	}
+
+	logger.SetLevel(logrusLevel)
 
 	// Configuration.
 	target := config.NewTarget(flProject, flRegions, flLabelSelector)
@@ -152,6 +162,12 @@ func flagsAreValid() (bool, error) {
 
 			flSteps = append(flSteps, value)
 		}
+	}
+
+	var err error
+	logrusLevel, err = logrus.ParseLevel(flLoggingLevel)
+	if err != nil {
+		return false, errors.Wrap(err, "invalid verbosity value")
 	}
 
 	if !flCLI && flHTTPAddr == "" {
