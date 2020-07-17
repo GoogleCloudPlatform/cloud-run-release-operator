@@ -73,7 +73,7 @@ func init() {
 	flag.StringVar(&flHTTPAddr, "http-addr", "", "listen on http portrun on request (e.g. :8080)")
 	flag.StringVar(&flProject, "project", "", "project in which the service is deployed")
 	flag.StringVar(&flLabelSelector, "label", "rollout-strategy=gradual", "filter services based on a label (e.g. team=backend)")
-	flag.StringVar(&flRegionsString, "regions", "us-east1", "the Cloud Run regions where the service should be looked at")
+	flag.StringVar(&flRegionsString, "regions", "", "the Cloud Run regions where the service should be looked at")
 	flag.Var(&flSteps, "step", "a percentage in traffic the candidate should go through")
 	flag.StringVar(&flStepsString, "steps", "5,20,50,80", "define steps in one flag separated by commas (e.g. 5,30,60)")
 	flag.Int64Var(&flInterval, "interval", 0, "the time between each rollout step")
@@ -111,7 +111,7 @@ func main() {
 
 func runCLI(logger *logrus.Logger, cfg *config.Config) {
 	for {
-		services, err := getTargetedServices(context.Background(), cfg.Targets)
+		services, err := getTargetedServices(context.Background(), logger, cfg.Targets)
 		if err != nil {
 			log.Fatalf("failed to get targeted services %v", err)
 		}
