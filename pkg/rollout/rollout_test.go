@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/run/mock"
+	"github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/mock"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/config"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/rollout"
 	"github.com/google/go-cmp/cmp"
@@ -35,7 +35,7 @@ func generateService(opts *ServiceOpts) *run.Service {
 }
 
 func TestUpdateService(t *testing.T) {
-	runclient := &mock.RunAPI{}
+	runclient := &mock.Run{}
 	strategy := &config.Strategy{
 		Steps: []int64{10, 40, 70},
 	}
@@ -197,7 +197,7 @@ func TestUpdateService(t *testing.T) {
 }
 
 func TestSplitTraffic(t *testing.T) {
-	runclient := &mock.RunAPI{}
+	runclient := &mock.Run{}
 	strategy := &config.Strategy{
 		Steps: []int64{5, 30, 60},
 	}
