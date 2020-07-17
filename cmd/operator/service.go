@@ -15,7 +15,7 @@ import (
 // getTargetedServices returned a list of service records that match the target
 // configuration.
 func getTargetedServices(ctx context.Context, logger *logrus.Logger, targets []*config.Target) ([]*rollout.ServiceRecord, error) {
-	logger.Debug("filtering all targeted services")
+	logger.Debug("querying Cloud Run API to get all targeted services")
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -66,7 +66,7 @@ func getServicesByRegionAndLabel(ctx context.Context, logger *logrus.Logger, pro
 		"labelSelector": labelSelector,
 	})
 
-	lg.Debugf("querying Cloud Run services")
+	lg.Debug("querying Cloud Run services")
 	runclient, err := runapi.NewAPIClient(ctx, region)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to initialize Cloud Run client")
@@ -99,7 +99,7 @@ func determineRegions(ctx context.Context, logger *logrus.Logger, target *config
 		return nil, errors.Wrap(err, "cannot get list of regions from Cloud Run API")
 	}
 
-	logger.Debug("finished retrieving regions from the API")
+	logger.Debug("finished retrieving %d regions from the API", len(regions))
 	return regions, nil
 }
 
