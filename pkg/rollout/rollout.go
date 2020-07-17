@@ -82,14 +82,14 @@ func (r *Rollout) Rollout() (bool, error) {
 func (r *Rollout) UpdateService(svc *run.Service) (*run.Service, error) {
 	stable := DetectStableRevisionName(svc)
 	if stable == "" {
-		r.log.Info("Could not determine stable revision")
+		r.log.Info("could not determine stable revision")
 		return nil, nil
 	}
 	r.log.Debugf("%q is the stable revision", stable)
 
 	candidate := DetectCandidateRevisionName(svc, stable)
 	if candidate == "" {
-		r.log.Info("Could not determine candidate revision")
+		r.log.Info("could not determine candidate revision")
 		return nil, nil
 	}
 	r.log.Debugf("%q is the candidate revision", candidate)
@@ -215,7 +215,7 @@ func (r *Rollout) nextCandidateTraffic(current int64) int64 {
 
 // updateAnnotations updates the annotations to keep some state about the rollout.
 func (r *Rollout) updateAnnotations(svc *run.Service, stable, candidate string) *run.Service {
-	r.log.Debug("updating annotations for the service")
+	r.log.Debug("including annotations for the service")
 	if svc.Metadata.Annotations == nil {
 		svc.Metadata.Annotations = make(map[string]string)
 	}

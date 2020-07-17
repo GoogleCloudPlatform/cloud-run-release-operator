@@ -53,9 +53,7 @@ func (steps stepFlags) String() string {
 }
 
 var (
-	logrusLevel    logrus.Level
-	flLoggingLevel string
-
+	flLoggingLevel  string
 	flCLI           bool
 	flHTTPAddr      string
 	flProject       string
@@ -94,12 +92,16 @@ func init() {
 
 func main() {
 	logger := logrus.New()
+	loggingLevel, err := logrus.ParseLevel(flLoggingLevel)
+	if err != nil {
+		logger.Fatalf("invalid logging level: %v", err)
+	}
+	logger.SetLevel(loggingLevel)
+
 	valid, err := flagsAreValid()
 	if !valid {
 		logger.Fatalf("invalid flags: %v", err)
 	}
-
-	logger.SetLevel(logrusLevel)
 
 	// Configuration.
 	target := config.NewTarget(flProject, flRegions, flLabelSelector)
@@ -162,12 +164,6 @@ func flagsAreValid() (bool, error) {
 
 			flSteps = append(flSteps, value)
 		}
-	}
-
-	var err error
-	logrusLevel, err = logrus.ParseLevel(flLoggingLevel)
-	if err != nil {
-		return false, errors.Wrap(err, "invalid verbosity value")
 	}
 
 	if !flCLI && flHTTPAddr == "" {
