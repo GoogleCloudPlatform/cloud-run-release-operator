@@ -88,7 +88,7 @@ func getServicesByRegionAndLabel(ctx context.Context, logger *logrus.Logger, pro
 func determineRegions(ctx context.Context, logger *logrus.Logger, target *config.Target) ([]string, error) {
 	regions := target.Regions
 	if len(regions) != 0 {
-		logger.Debug("regions set in configuration")
+		logger.Debug("using predefined list of regions, skip querying from API")
 		return regions, nil
 	}
 
