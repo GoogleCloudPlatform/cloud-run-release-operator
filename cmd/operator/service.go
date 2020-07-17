@@ -25,7 +25,7 @@ func getTargetedServices(ctx context.Context, targets []*config.Target) ([]*roll
 	)
 
 	for _, target := range targets {
-		regions, err := determineRegions(target)
+		regions, err := determineRegions(ctx, target)
 		if err != nil {
 			return nil, errors.Wrap(err, "cannot determine regions")
 		}
@@ -76,13 +76,13 @@ func getServicesByRegionAndLabel(ctx context.Context, project, region, labelSele
 //
 // If the target configuration does not specify any regions, the entire list of
 // regions is retrieved from API.
-func determineRegions(target *config.Target) ([]string, error) {
+func determineRegions(ctx context.Context, target *config.Target) ([]string, error) {
 	regions := target.Regions
 	if len(regions) != 0 {
 		return regions, nil
 	}
 
-	regions, err := runapi.Regions(target.Project)
+	regions, err := runapi.Regions(ctx, target.Project)
 	if err != nil {
 		return nil, errors.Wrap(err, "Cannot get list of regions from Cloud Run API")
 	}

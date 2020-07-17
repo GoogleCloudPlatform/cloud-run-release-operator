@@ -22,6 +22,9 @@ type API struct {
 }
 
 // regions are the available regions.
+//
+// TODO: caching regions might be unnecessary if we are querying them once during
+// the lifespan of the process.
 var regions = []string{}
 
 // NewAPIClient initializes an instance of APIService.
@@ -63,12 +66,12 @@ func (a *API) ServicesWithLabelSelector(namespace string, labelSelector string) 
 }
 
 // Regions gets the supported regions for the project.
-func Regions(project string) ([]string, error) {
+func Regions(ctx context.Context, project string) ([]string, error) {
 	if len(regions) != 0 {
 		return regions, nil
 	}
 
-	client, err := run.NewService(context.Background())
+	client, err := run.NewService(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not initialize client for the Cloud Run API")
 	}

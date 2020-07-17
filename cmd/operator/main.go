@@ -116,8 +116,7 @@ func runCLI(logger *logrus.Logger, cfg *config.Config) {
 			log.Fatalf("failed to get targeted services %v", err)
 		}
 		if len(services) == 0 {
-			logger.Warn("No service matches the targets")
-			sleepInSeconds(cfg.Strategy.Interval)
+			logger.Warn("no service matches the targets")
 		}
 
 		// TODO: Handle all the filtered services
@@ -135,13 +134,9 @@ func runCLI(logger *logrus.Logger, cfg *config.Config) {
 			logger.Info("Rollout process succeeded")
 		}
 
-		sleepInSeconds(cfg.Strategy.Interval)
+		duration := time.Duration(cfg.Strategy.Interval)
+		time.Sleep(duration * time.Second)
 	}
-}
-
-func sleepInSeconds(interval int64) {
-	duration := time.Duration(interval)
-	time.Sleep(duration * time.Second)
 }
 
 func flagsAreValid() (bool, error) {
