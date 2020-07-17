@@ -140,7 +140,7 @@ func runCLI(logger *logrus.Logger, cfg *config.Config) {
 
 		changed, err := roll.Rollout()
 		if err != nil {
-			logger.Infof("rollout failed: %v", err)
+			logger.Fatalf("rollout failed: %v", err)
 		}
 		if changed {
 			logger.Info("rollout process succeeded")
