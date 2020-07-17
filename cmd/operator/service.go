@@ -99,7 +99,7 @@ func determineRegions(ctx context.Context, logger *logrus.Logger, target *config
 		return nil, errors.Wrap(err, "cannot get list of regions from Cloud Run API")
 	}
 
-	logger.Debug("finished retrieving %d regions from the API", len(regions))
+	logger.Debugf("finished retrieving %d regions from the API", len(regions))
 	return regions, nil
 }
 
