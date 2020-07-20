@@ -6,7 +6,7 @@ type MetricsCheck string
 // Supported metrics checks.
 const (
 	LatencyMetricsCheck MetricsCheck = "request-latency"
-	ErrorMetricsCheck                = "error-rate"
+	ErrorMetricsCheck                = "error-rate-percent"
 )
 
 // Target is the configuration to filter services.
