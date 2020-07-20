@@ -1,5 +1,14 @@
 package config
 
+// MetricsCheck is metrics check type.
+type MetricsCheck string
+
+// Supported metrics checks.
+const (
+	LatencyCheckType MetricsCheck = "request-latency"
+	ErrorCheckType                = "error-rate"
+)
+
 // Target is the configuration to filter services.
 //
 // A target might have the following form
@@ -15,9 +24,18 @@ type Target struct {
 	LabelSelector string
 }
 
+// Check is a metrics threshold that should be met to consider a candidate
+// healthy.
+type Check struct {
+	Type       MetricsCheck
+	Percentile float64
+	Max        float64
+}
+
 // Strategy is the steps and configuration for rollout.
 type Strategy struct {
-	Steps []int64
+	Steps  []int64
+	Checks []Check
 
 	// TODO: Give this property a clearer name.
 	Interval int64
