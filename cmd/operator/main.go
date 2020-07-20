@@ -104,14 +104,16 @@ func main() {
 		)
 	}
 
+	ctx := context.Background()
+
 	if flCLI {
-		runCLI(logger, cfg)
+		runCLI(ctx, logger, cfg)
 	}
 }
 
-func runCLI(logger *logrus.Logger, cfg *config.Config) {
+func runCLI(ctx context.Context, logger *logrus.Logger, cfg *config.Config) {
 	for {
-		services, err := getTargetedServices(context.Background(), logger, cfg.Targets)
+		services, err := getTargetedServices(ctx, logger, cfg.Targets)
 		if err != nil {
 			log.Fatalf("failed to get targeted services %v", err)
 		}
@@ -120,7 +122,7 @@ func runCLI(logger *logrus.Logger, cfg *config.Config) {
 		}
 
 		// TODO: Handle all the filtered services
-		client, err := runapi.NewAPIClient(context.Background(), services[0].Region)
+		client, err := runapi.NewAPIClient(ctx, services[0].Region)
 		if err != nil {
 			logger.Fatal("failed to initialize Cloud Run API client")
 		}

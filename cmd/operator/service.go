@@ -77,7 +77,7 @@ func getServicesByRegionAndLabel(ctx context.Context, logger *logrus.Logger, pro
 		return nil, errors.Wrapf(err, "failed to get services with label %q in region %q", labelSelector, region)
 	}
 
-	lg.Debugf("found %d service(s)", len(svcs))
+	lg.WithField("n", len(svcs)).Debug("finished retrieving services from the API")
 	return svcs, nil
 }
 
@@ -99,7 +99,7 @@ func determineRegions(ctx context.Context, logger *logrus.Logger, target *config
 		return nil, errors.Wrap(err, "cannot get list of regions from Cloud Run API")
 	}
 
-	logger.Debugf("finished retrieving %d regions from the API", len(regions))
+	logger.WithField("n", len(regions)).Debug("finished retrieving regions from the API")
 	return regions, nil
 }
 
