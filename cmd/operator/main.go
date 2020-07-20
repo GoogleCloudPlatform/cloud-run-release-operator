@@ -105,7 +105,6 @@ func main() {
 	}
 
 	ctx := context.Background()
-
 	if flCLI {
 		runCLI(ctx, logger, cfg)
 	}
