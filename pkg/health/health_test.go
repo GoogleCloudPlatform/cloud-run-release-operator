@@ -18,7 +18,7 @@ func TestIsHealthy(t *testing.T) {
 		return 500, nil
 	}
 	metricsMock.ErrorRateFn = func(ctx context.Context, query metrics.Query, offset time.Duration) (float64, error) {
-		return 1, nil
+		return 0.01, nil
 	}
 
 	tests := []struct {
@@ -49,7 +49,17 @@ func TestIsHealthy(t *testing.T) {
 			expected: true,
 		},
 		{
-			name:   "unhealthy revision",
+			name:   "unhealthy revision, miss latency",
+			query:  metricsMocker.Query{},
+			offset: 5 * time.Minute,
+			metrics: []config.Metric{
+				{Type: config.LatencyMetricsCheck, Percentile: 99, Max: 499},
+				{Type: config.ErrorRateMetricsCheck, Max: 0.95},
+			},
+			expected: false,
+		},
+		{
+			name:   "unhealthy revision, miss error rate",
 			query:  metricsMocker.Query{},
 			offset: 5 * time.Minute,
 			metrics: []config.Metric{

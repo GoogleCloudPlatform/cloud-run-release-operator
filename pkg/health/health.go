@@ -70,5 +70,6 @@ func (h *Health) checkErrorRate(ctx context.Context, query metrics.Query, offset
 		return false, errors.Wrap(err, "failed to get error rate metrics")
 	}
 
-	return rate <= max, nil
+	// Max is in percent, multiply rate by 100 to compare equivalent values.
+	return (rate * 100) <= max, nil
 }
