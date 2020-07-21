@@ -25,12 +25,16 @@ const (
 
 // Metrics represents a monitoring API such as Stackdriver.
 //
+// RequestCount count returns the number of requests for the given offset and
+// query.
+//
 // Latency returns the request latency after applying the specified series
 // aligner and cross series reducer. The result is in milliseconds.
 //
 // Error rate gets all the server responses. It calculates the error rate by
 // performing the operation (5xx responses / all responses).
 type Metrics interface {
+	RequestCount(ctx context.Context, query Query, offset time.Duration) (int64, error)
 	Latency(ctx context.Context, query Query, offset time.Duration, alignReduceType AlignReduce) (float64, error)
 	ErrorRate(ctx context.Context, query Query, offset time.Duration) (float64, error)
 }

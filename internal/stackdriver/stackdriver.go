@@ -43,6 +43,46 @@ func NewAPIClient(ctx context.Context, project string) (*API, error) {
 	}, nil
 }
 
+// RequestCount count returns the number of requests for the given offset and
+// query.
+func (a *API) RequestCount(ctx context.Context, query Query, offset time.Duration) (int64, error) {
+	query = addFilterToQuery(query, "metric.type", requestCount)
+	endTime := time.Now()
+	startTime := endTime.Add(-1 * offset)
+
+	it := a.MetricClient.ListTimeSeries(ctx, &monitoringpb.ListTimeSeriesRequest{
+		Name:   "projects/" + a.Project,
+		Filter: query.Query(),
+		Interval: &monitoringpb.TimeInterval{
+			StartTime: timestamp.New(startTime),
+			EndTime:   timestamp.New(endTime),
+		},
+		Aggregation: &monitoringpb.Aggregation{
+			AlignmentPeriod:    duration.New(offset),
+			PerSeriesAligner:   monitoringpb.Aggregation_ALIGN_DELTA,
+			GroupByFields:      []string{"resource.labels.service_name"},
+			CrossSeriesReducer: monitoringpb.Aggregation_REDUCE_SUM,
+		},
+	})
+
+	for {
+		series, err := it.Next()
+
+		// If this is hit first, it means that no request were made during the
+		// given offset.
+		if err == iterator.Done {
+			return 0, nil
+		}
+		if err != nil {
+			return 0, errors.Wrap(err, "error when iterating through time series")
+		}
+
+		// The request count is aggregated for the entire revision, so only one
+		// point is returned.
+		return series.Points[0].Value.GetInt64Value(), nil
+	}
+}
+
 // Latency returns the latency for the resource matching the filter.
 func (a *API) Latency(ctx context.Context, query metrics.Query, offset time.Duration, alignReduceType metrics.AlignReduce) (float64, error) {
 	query = addFilterToQuery(query, "metric.type", requestLatencies)
