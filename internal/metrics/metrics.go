@@ -2,9 +2,8 @@ package metrics
 
 import (
 	"context"
+	"fmt"
 	"time"
-
-	"github.com/pkg/errors"
 )
 
 // Query is the filter used to retrieve metrics data.
@@ -51,6 +50,6 @@ func PercentileToAlignReduce(percentile float64) (AlignReduce, error) {
 	case 50:
 		return Align50Reduce50, nil
 	default:
-		return 0, errors.Errorf("unsupported percentile value %.2f", percentile)
+		return 0, fmt.Errorf("unsupported percentile value %.2f", percentile)
 	}
 }

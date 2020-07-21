@@ -50,7 +50,12 @@ func (h *Health) IsHealthy(ctx context.Context, query metrics.Query, healthCheck
 
 // checkLatency checks that the threshold for latency is not exceeded.
 func (h *Health) checkLatency(ctx context.Context, query metrics.Query, offset time.Duration, percentile, max float64) (bool, error) {
-	latency, err := h.Metrics.Latency(ctx, query, offset, metrics.PercentileToAlignReduce(percentile))
+	alignerReducer, err := metrics.PercentileToAlignReduce(percentile)
+	if err != nil {
+		return false, errors.Wrap(err, "invalid percentile")
+	}
+
+	latency, err := h.Metrics.Latency(ctx, query, offset, alignerReducer)
 	if err != nil {
 		return false, errors.Wrap(err, "failed to get latency metrics")
 	}
