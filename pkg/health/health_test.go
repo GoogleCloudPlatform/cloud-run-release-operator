@@ -54,7 +54,6 @@ func TestIsHealthy(t *testing.T) {
 			offset: 5 * time.Minute,
 			metrics: []config.Metric{
 				{Type: config.LatencyMetricsCheck, Percentile: 99, Max: 499},
-				{Type: config.ErrorRateMetricsCheck, Max: 0.95},
 			},
 			expected: false,
 		},
@@ -63,7 +62,6 @@ func TestIsHealthy(t *testing.T) {
 			query:  metricsMocker.Query{},
 			offset: 5 * time.Minute,
 			metrics: []config.Metric{
-				{Type: config.LatencyMetricsCheck, Percentile: 99, Max: 499},
 				{Type: config.ErrorRateMetricsCheck, Max: 0.95},
 			},
 			expected: false,
