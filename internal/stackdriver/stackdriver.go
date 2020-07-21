@@ -68,7 +68,7 @@ func (a *API) RequestCount(ctx context.Context, query Query, offset time.Duratio
 	for {
 		series, err := it.Next()
 
-		// If this is hit first, it means that no request were made during the
+		// If this is hit first, it means that no request was made during the
 		// given offset.
 		if err == iterator.Done {
 			return 0, nil
