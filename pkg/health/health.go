@@ -2,6 +2,7 @@ package health
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/metrics"
@@ -9,67 +10,149 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Checker validates that revision is healthy.
-type Checker interface {
-	IsHealthy(ctx context.Context, query metrics.Query, healthCheckOffset time.Duration, metricsChecks []config.Metric) (bool, error)
+// Diagnosis is the information about the health of the revision.
+type Diagnosis struct {
+	EnoughRequests     bool
+	CheckResults       []*CheckResult
+	FailedCheckResults []*CheckResult
+	IsHealthy          bool
 }
 
-// Health is the candidate's health status checker.
-type Health struct {
-	Metrics metrics.Metrics
+// CheckResult is information about a metrics criteria check.
+type CheckResult struct {
+	MetricsType   config.MetricsCheck
+	MinOrMaxValue interface{}
+	ActualValue   interface{}
+	IsCriteriaMet bool
+	Reason        string
 }
 
-// New initializes a health checker.
-func New(metrics metrics.Metrics) *Health {
-	return &Health{
-		Metrics: metrics,
+// Diagnose attempts to determine the health of a revision.
+//
+// If the minimum number of requests is not met, then health cannot be
+// determined and Diagnosis.EnoughRequests is set to false.
+//
+// Otherwise, all metrics criteria are checked to determine if the revision is
+// healthy.
+func Diagnose(ctx context.Context, provider metrics.Metrics, query metrics.Query,
+	offset time.Duration, minRequests int64, metricsCriteria []config.Metric) (*Diagnosis, error) {
+
+	metricsValues, err := CollectMetrics(ctx, provider, query, offset, metricsCriteria)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not collect metrics")
 	}
+
+	isHealthy := true
+	var results, failedResults []*CheckResult
+	for i, criteria := range metricsCriteria {
+		result := determineResult(criteria.Type, criteria.Min, criteria.Max, metricsValues[i])
+		results = append(results, result)
+
+		if !result.IsCriteriaMet {
+			isHealthy = false
+			failedResults = append(failedResults, result)
+		}
+	}
+
+	return &Diagnosis{
+		EnoughRequests:     true,
+		CheckResults:       results,
+		FailedCheckResults: failedResults,
+		IsHealthy:          isHealthy,
+	}, nil
 }
 
-// IsHealthy checks if a revision is healthy based on the metrics configuration.
-func (h *Health) IsHealthy(ctx context.Context, query metrics.Query, healthCheckOffset time.Duration, metricsChecks []config.Metric) (bool, error) {
-	healthy := true
-	for _, check := range metricsChecks {
+// CollectMetrics returns an array of values collected for each of the specified
+// metrics criteria.
+func CollectMetrics(ctx context.Context, provider metrics.Metrics, query metrics.Query, offset time.Duration, metricsCriteria []config.Metric) ([]interface{}, error) {
+
+	var values []interface{}
+	for _, criteria := range metricsCriteria {
+		var value interface{}
 		var err error
-		switch check.Type {
+
+		switch criteria.Type {
 		case config.LatencyMetricsCheck:
-			healthy, err = h.checkLatency(ctx, query, healthCheckOffset, check.Percentile, check.Max)
+			value, err = latency(ctx, provider, query, offset, criteria.Percentile)
 			break
 		case config.ErrorRateMetricsCheck:
-			healthy, err = h.checkErrorRate(ctx, query, healthCheckOffset, check.Max)
+			value, err = errorRate(ctx, provider, query, offset)
 			break
+		default:
+			return nil, errors.Errorf("unimplemented metrics %q", criteria.Type)
 		}
 
 		if err != nil {
-			return false, errors.Wrapf(err, "failed to check metrics %q", check.Type)
+			return nil, errors.Wrapf(err, "failed to obtain metrics %q", criteria.Type)
 		}
+		values = append(values, value)
 	}
 
-	return healthy, nil
+	return values, nil
 }
 
-// checkLatency checks that the threshold for latency is not exceeded.
-func (h *Health) checkLatency(ctx context.Context, query metrics.Query, offset time.Duration, percentile, max float64) (bool, error) {
+// determineResult concludes if metrics criteria was met.
+//
+// The returned value also includes a string with details of why the criteria
+// was met or not.
+func determineResult(metricsType config.MetricsCheck, min interface{}, max interface{}, actualValue interface{}) *CheckResult {
+	result := &CheckResult{MetricsType: metricsType, ActualValue: actualValue}
+
+	switch metricsType {
+	case config.LatencyMetricsCheck:
+		actual := actualValue.(float64)
+		reasonFormat := "actual value %.2f is %s than max allowed latency %.2f"
+
+		if actual <= max.(float64) {
+			result.IsCriteriaMet = true
+			result.Reason = fmt.Sprintf(reasonFormat, actual, "less or equal", max)
+		} else {
+			result.IsCriteriaMet = false
+			result.Reason = fmt.Sprintf(reasonFormat, actual, "greater", max)
+		}
+		result.MinOrMaxValue = max
+		break
+
+	case config.ErrorRateMetricsCheck:
+		actual := actualValue.(float64)
+		reasonFormat := "actual value %.2f is %s than max allowed error rate %.2f"
+
+		if actual <= max.(float64) {
+			result.IsCriteriaMet = true
+			result.Reason = fmt.Sprintf(reasonFormat, actual, "less or equal", max)
+		} else {
+			result.IsCriteriaMet = false
+			result.Reason = fmt.Sprintf(reasonFormat, actual, "greater", max)
+		}
+		result.MinOrMaxValue = max
+		break
+	}
+
+	return result
+}
+
+// latency returns the latency for the given offset and percentile.
+func latency(ctx context.Context, provider metrics.Metrics, query metrics.Query, offset time.Duration, percentile float64) (float64, error) {
 	alignerReducer, err := metrics.PercentileToAlignReduce(percentile)
 	if err != nil {
-		return false, errors.Wrap(err, "invalid percentile")
+		return 0, errors.Wrap(err, "invalid percentile")
 	}
 
-	latency, err := h.Metrics.Latency(ctx, query, offset, alignerReducer)
+	latency, err := provider.Latency(ctx, query, offset, alignerReducer)
 	if err != nil {
-		return false, errors.Wrap(err, "failed to get latency metrics")
+		return 0, errors.Wrap(err, "failed to get latency metrics")
 	}
 
-	return latency <= max, nil
+	return latency, nil
 }
 
-// checkErrorRate checks that the threshold for error rate is not exceeded.
-func (h *Health) checkErrorRate(ctx context.Context, query metrics.Query, offset time.Duration, max float64) (bool, error) {
-	rate, err := h.Metrics.ErrorRate(ctx, query, offset)
+// errorRate returns the percentage of errors during the given offset.
+func errorRate(ctx context.Context, provider metrics.Metrics, query metrics.Query, offset time.Duration) (float64, error) {
+	rate, err := provider.ErrorRate(ctx, query, offset)
 	if err != nil {
-		return false, errors.Wrap(err, "failed to get error rate metrics")
+		return 0, errors.Wrap(err, "failed to get error rate metrics")
 	}
 
-	// Max is in percent, multiply rate by 100 to compare equivalent values.
-	return (rate * 100) <= max, nil
+	// Multiply rate by 100 to have a percentage.
+	return rate * 100, nil
 }
