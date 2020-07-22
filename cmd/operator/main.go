@@ -197,7 +197,6 @@ func flagsAreValid() (bool, error) {
 // config.Metric based on them.
 func metricsFromFlags(errorRate, latencyP99, latencyP95, latencyP50 float64) []config.Metric {
 	var metrics []config.Metric
-
 	metrics = append(metrics, config.Metric{Type: config.ErrorRateMetricsCheck, Max: errorRate})
 
 	if latencyP99 > 0 {
