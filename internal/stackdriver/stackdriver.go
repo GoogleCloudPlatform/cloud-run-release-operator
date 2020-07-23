@@ -65,22 +65,22 @@ func (a *API) RequestCount(ctx context.Context, query Query, offset time.Duratio
 		},
 	})
 
-	for {
-		series, err := it.Next()
+	// The request count is aggregated for the entire service, so only one time
+	// series and a point is returned. So, there's no need for a loop.
+	series, err := it.Next()
 
-		// If this is hit first, it means that no request was made during the
-		// given offset.
-		if err == iterator.Done {
-			return 0, nil
-		}
-		if err != nil {
-			return 0, errors.Wrap(err, "error when iterating through time series")
-		}
-
-		// The request count is aggregated for the entire revision, so only one
-		// point is returned.
-		return series.Points[0].Value.GetInt64Value(), nil
+	// This happens when no request was made during the given offset.
+	if err == iterator.Done {
+		return 0, nil
 	}
+	if err != nil {
+		return 0, errors.Wrap(err, "error when retrieving time series")
+	}
+	if len(series.Points) == 0 {
+		return 0, errors.New("no data point was retrieved")
+	}
+
+	return series.Points[0].GetValue().GetInt64Value(), nil
 }
 
 // Latency returns the latency for the resource matching the filter.
