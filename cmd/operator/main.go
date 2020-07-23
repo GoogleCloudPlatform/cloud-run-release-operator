@@ -87,10 +87,10 @@ func init() {
 	flag.Var(&flSteps, "step", "a percentage in traffic the candidate should go through")
 	flag.StringVar(&flStepsString, "steps", "5,20,50,80", "define steps in one flag separated by commas (e.g. 5,30,60)")
 	flag.Int64Var(&flInterval, "interval", 0, "the time between each rollout step")
-	flag.Float64Var(&flErrorRate, "max-error-rate", 1, "the maximum allowed error rate (in percent)")
-	flag.Float64Var(&flLatencyP99, "latency-p99", 750, "99%% of the requests must have latency below this value (set 0 to ignore)")
-	flag.Float64Var(&flLatencyP95, "latency-p95", 0, "95%% of the requests must have latency below this value (set 0 to ignore)")
-	flag.Float64Var(&flLatencyP50, "latency-p50", 0, "50%% of the requests must have latency below this value (set 0 to ignore)")
+	flag.Float64Var(&flErrorRate, "max-error-rate", 1.0, "expected max server error rate (in percent)")
+	flag.Float64Var(&flLatencyP99, "latency-p99", 0, "expected max latency for 99th percentile of requests (set 0 to ignore)")
+	flag.Float64Var(&flLatencyP95, "latency-p95", 0, "expected max latency for 95th percentile of requests (set 0 to ignore)")
+	flag.Float64Var(&flLatencyP50, "latency-p50", 0, "expected max latency for 50th percentile of requests (set 0 to ignore)")
 	flag.Parse()
 
 	if flRegionsString != "" {
@@ -99,7 +99,6 @@ func init() {
 }
 
 func main() {
-	// Logger.
 	logger := logrus.New()
 	loggingLevel, err := logrus.ParseLevel(flLoggingLevel)
 	if err != nil {
@@ -109,7 +108,7 @@ func main() {
 
 	if !isatty.IsTerminal(os.Stdout.Fd()) {
 		logger.Formatter = stackdriver.NewFormatter(
-			stackdriver.WithService("cloud-run-release-operator"),
+			stackdriver.WithService(os.Getenv("K_SERVICE")),
 		)
 	}
 
@@ -120,8 +119,9 @@ func main() {
 
 	// Configuration.
 	target := config.NewTarget(flProject, flRegions, flLabelSelector)
-	metricsCriteria := metricsFromFlags(flErrorRate, flLatencyP99, flLatencyP95, flLatencyP50)
-	cfg := config.WithValues([]*config.Target{target}, flSteps, flInterval, metricsCriteria)
+	healthCriteria := healthCriteriaFromFlags(flErrorRate, flLatencyP99, flLatencyP95, flLatencyP50)
+	printHealthCriteria(logger, healthCriteria)
+	cfg := config.WithValues([]*config.Target{target}, flSteps, flInterval, healthCriteria)
 	if !cfg.IsValid(flCLI) {
 		logger.Fatalf("invalid rollout configuration")
 	}
@@ -193,11 +193,12 @@ func flagsAreValid() (bool, error) {
 	return true, nil
 }
 
-// metricsFromFlags checks the metrics-related flags and return an array of
-// config.Metric based on them.
-func metricsFromFlags(errorRate, latencyP99, latencyP95, latencyP50 float64) []config.Metric {
-	var metrics []config.Metric
-	metrics = append(metrics, config.Metric{Type: config.ErrorRateMetricsCheck, Max: errorRate})
+// healthCriteriaFromFlags checks the metrics-related flags and return an array
+// of config.Metric based on them.
+func healthCriteriaFromFlags(errorRate, latencyP99, latencyP95, latencyP50 float64) []config.Metric {
+	metrics := []config.Metric{
+		{Type: config.ErrorRateMetricsCheck, Max: errorRate},
+	}
 
 	if latencyP99 > 0 {
 		metrics = append(metrics, config.Metric{Type: config.LatencyMetricsCheck, Percentile: 99, Max: latencyP99})
@@ -210,4 +211,24 @@ func metricsFromFlags(errorRate, latencyP99, latencyP95, latencyP50 float64) []c
 	}
 
 	return metrics
+}
+
+func printHealthCriteria(logger *logrus.Logger, healthCriteria []config.Metric) {
+	for _, criteria := range healthCriteria {
+		lg := logger.WithField("metricsType", criteria.Type)
+
+		switch criteria.Type {
+		case config.ErrorRateMetricsCheck:
+			lg.WithField("max", criteria.Max).Debug("found health criterion")
+			break
+		case config.LatencyMetricsCheck:
+			lg.WithFields(logrus.Fields{
+				"percentile": criteria.Percentile,
+				"max":        criteria.Max,
+			}).Debug("found health criterion")
+			break
+		default:
+			lg.Debug("invalid health criterion")
+		}
+	}
 }
