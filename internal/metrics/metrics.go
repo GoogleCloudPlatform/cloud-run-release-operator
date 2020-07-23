@@ -46,7 +46,7 @@ func PercentileToAlignReduce(percentile float64) (AlignReduce, error) {
 		return Align99Reduce99, nil
 	case 95:
 		return Align95Reduce95, nil
-	case 50.0:
+	case 50:
 		return Align50Reduce50, nil
 	default:
 		return 0, errors.Errorf("unsupported percentile value %.2f", percentile)
