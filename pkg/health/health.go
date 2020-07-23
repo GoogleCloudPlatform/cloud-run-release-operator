@@ -35,16 +35,16 @@ type CheckResult struct {
 // Otherwise, all metrics criteria are checked to determine if the revision is
 // healthy.
 func Diagnose(ctx context.Context, provider metrics.Metrics, query metrics.Query,
-	offset time.Duration, minRequests int64, metricsCriteria []config.Metric) (*Diagnosis, error) {
+	offset time.Duration, minRequests int64, healthCriteria []config.Metric) (*Diagnosis, error) {
 
-	metricsValues, err := CollectMetrics(ctx, provider, query, offset, metricsCriteria)
+	metricsValues, err := CollectMetrics(ctx, provider, query, offset, healthCriteria)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not collect metrics")
 	}
 
 	isHealthy := true
 	var results, failedResults []*CheckResult
-	for i, criteria := range metricsCriteria {
+	for i, criteria := range healthCriteria {
 		result := determineResult(criteria.Type, criteria.Min, criteria.Max, metricsValues[i])
 		results = append(results, result)
 
@@ -64,10 +64,10 @@ func Diagnose(ctx context.Context, provider metrics.Metrics, query metrics.Query
 
 // CollectMetrics returns an array of values collected for each of the specified
 // metrics criteria.
-func CollectMetrics(ctx context.Context, provider metrics.Metrics, query metrics.Query, offset time.Duration, metricsCriteria []config.Metric) ([]interface{}, error) {
+func CollectMetrics(ctx context.Context, provider metrics.Metrics, query metrics.Query, offset time.Duration, healthCriteria []config.Metric) ([]interface{}, error) {
 
 	var values []interface{}
-	for _, criteria := range metricsCriteria {
+	for _, criteria := range healthCriteria {
 		var value interface{}
 		var err error
 

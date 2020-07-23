@@ -23,19 +23,19 @@ func TestDiagnose(t *testing.T) {
 	}
 
 	tests := []struct {
-		name            string
-		query           metrics.Query
-		offset          time.Duration
-		minRequests     int64
-		metricsCriteria []config.Metric
-		expected        *health.Diagnosis
+		name           string
+		query          metrics.Query
+		offset         time.Duration
+		minRequests    int64
+		healthCriteria []config.Metric
+		expected       *health.Diagnosis
 	}{
 		{
 			name:        "healthy revision",
 			query:       metricsMocker.Query{},
 			offset:      5 * time.Minute,
 			minRequests: 1000,
-			metricsCriteria: []config.Metric{
+			healthCriteria: []config.Metric{
 				{Type: config.LatencyMetricsCheck, Percentile: 99, Max: 750},
 				{Type: config.ErrorRateMetricsCheck, Max: 5},
 			},
@@ -65,7 +65,7 @@ func TestDiagnose(t *testing.T) {
 			query:       metricsMocker.Query{},
 			offset:      5 * time.Minute,
 			minRequests: 1000,
-			metricsCriteria: []config.Metric{
+			healthCriteria: []config.Metric{
 				{Type: config.LatencyMetricsCheck, Percentile: 99, Max: 500},
 				{Type: config.ErrorRateMetricsCheck, Max: 1},
 			},
@@ -95,7 +95,7 @@ func TestDiagnose(t *testing.T) {
 			query:       metricsMocker.Query{},
 			offset:      5 * time.Minute,
 			minRequests: 1000,
-			metricsCriteria: []config.Metric{
+			healthCriteria: []config.Metric{
 				{Type: config.LatencyMetricsCheck, Percentile: 99, Max: 499},
 			},
 			expected: &health.Diagnosis{
@@ -126,7 +126,7 @@ func TestDiagnose(t *testing.T) {
 			query:       metricsMocker.Query{},
 			offset:      5 * time.Minute,
 			minRequests: 1000,
-			metricsCriteria: []config.Metric{
+			healthCriteria: []config.Metric{
 				{Type: config.ErrorRateMetricsCheck, Max: 0.95},
 			},
 			expected: &health.Diagnosis{
@@ -157,7 +157,7 @@ func TestDiagnose(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			ctx := context.Background()
-			isHealthy, _ := health.Diagnose(ctx, metricsMock, test.query, test.offset, test.minRequests, test.metricsCriteria)
+			isHealthy, _ := health.Diagnose(ctx, metricsMock, test.query, test.offset, test.minRequests, test.healthCriteria)
 			assert.Equal(t, test.expected, isHealthy)
 		})
 	}
