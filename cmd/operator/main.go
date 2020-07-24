@@ -28,7 +28,7 @@ import (
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/stackdriver"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/config"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/rollout"
-	stackdriverFormatter "github.com/TV4/logrus-stackdriver-formatter"
+	sdlog "github.com/TV4/logrus-stackdriver-formatter"
 	isatty "github.com/mattn/go-isatty"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -109,8 +109,8 @@ func main() {
 	logger.SetLevel(loggingLevel)
 
 	if !isatty.IsTerminal(os.Stdout.Fd()) {
-		logger.Formatter = stackdriverFormatter.NewFormatter(
-			stackdriverFormatter.WithService(os.Getenv("K_SERVICE")),
+		logger.Formatter = sdlog.NewFormatter(
+			sdlog.WithService(os.Getenv("K_SERVICE")),
 		)
 	}
 
