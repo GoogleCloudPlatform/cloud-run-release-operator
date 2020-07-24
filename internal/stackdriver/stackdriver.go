@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/metrics"
+	"github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/util"
 	"github.com/pkg/errors"
 
 	// TODO: Migrate to cloud.google.com/go/monitoring/apiv3/v2 once RPC for MQL
@@ -47,6 +48,7 @@ func NewAPIClient(ctx context.Context, project string) (*API, error) {
 // RequestCount count returns the number of requests for the given offset and
 // query.
 func (a *API) RequestCount(ctx context.Context, query Query, offset time.Duration) (int64, error) {
+	logger := util.LoggerFromContext(ctx)
 	query = addFilterToQuery(query, "metric.type", requestCount)
 	endTime := time.Now()
 	startTime := endTime.Add(-1 * offset)
@@ -61,12 +63,16 @@ func (a *API) RequestCount(ctx context.Context, query Query, offset time.Duratio
 		AggregationGroupByFields("resource.labels.service_name").
 		AggregationCrossSeriesReducer("REDUCE_SUM")
 
+	logger.Debug("querying request count from Cloud Monitoring API")
 	resp, err := req.Do()
 	if err != nil {
 		return 0, errors.Wrap(err, "error when retrieving time series")
 	}
 	if len(resp.ExecutionErrors) != 0 {
-		return 0, errors.Errorf("execution errors occurred: %v", resp.ExecutionErrors)
+		for _, execError := range resp.ExecutionErrors {
+			loggerWith.WithField("message", execError.Message).Warn("execution error occurred")
+		}
+		return 0, errors.New("execution errors occurred")
 	}
 
 	// This happens when no request was made during the given offset.
