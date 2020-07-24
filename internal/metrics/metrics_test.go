@@ -1,7 +1,6 @@
 package metrics_test
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/metrics"
@@ -61,9 +60,6 @@ func TestPercentileToAlignReduce(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			alignReducer, err := metrics.PercentileToAlignReduce(test.percentile)
 			if test.shouldErr {
-				if err == nil {
-					fmt.Println(alignReducer)
-				}
 				assert.NotNil(t, err)
 			} else {
 				assert.Equal(t, test.expected, alignReducer)
