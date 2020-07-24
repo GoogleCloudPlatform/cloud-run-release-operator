@@ -19,10 +19,17 @@ func ContextWithLogger(ctx context.Context, logger *logrus.Entry) context.Contex
 
 // LoggerFromContext returns the logger from the context.
 func LoggerFromContext(ctx context.Context) *logrus.Entry {
-	logger := ctx.Value(loggerKey)
-	if logger == nil {
+	value := ctx.Value(loggerKey)
+	if value == nil {
+		logrus.Warnf("nil logger in context, creating a new one")
+		return logrus.NewEntry(logrus.New())
+	}
+
+	logger, ok := value.(*logrus.Entry)
+	if !ok {
+		logrus.Warnf("received wrong type of logger (%T)", logger)
 		logger = logrus.NewEntry(logrus.New())
 	}
 
-	return logger.(*logrus.Entry)
+	return logger
 }
