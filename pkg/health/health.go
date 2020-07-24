@@ -5,8 +5,10 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/metrics"
+	"github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/util"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/config"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 // DiagnosisResult is a possible result after a diagnosis.
@@ -43,6 +45,7 @@ type CheckResult struct {
 func Diagnose(ctx context.Context, provider metrics.Metrics, query metrics.Query,
 	offset time.Duration, minRequests int64, healthCriteria []config.Metric) (*Diagnosis, error) {
 
+	logger := util.LoggerFromContext(ctx)
 	metricsValues, err := CollectMetrics(ctx, provider, query, offset, healthCriteria)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not collect metrics")
@@ -56,6 +59,17 @@ func Diagnose(ctx context.Context, provider metrics.Metrics, query metrics.Query
 
 		if !result.IsCriteriaMet {
 			overallResult = Unhealthy
+
+			logger := logger.WithFields(logrus.Fields{
+				"metricsType": criteria.Type,
+				"threshold":   criteria.Threshold,
+				"actualValue": result.ActualValue,
+			})
+			// If criteria is a latency, we want to log the percentile as well
+			if criteria.Type == config.LatencyMetricsCheck {
+				logger = logger.WithField("percentile", criteria.Percentile)
+			}
+			logger.Debug("criteria was not met")
 		}
 	}
 
@@ -68,6 +82,8 @@ func Diagnose(ctx context.Context, provider metrics.Metrics, query metrics.Query
 // CollectMetrics returns an array of values collected for each of the specified
 // metrics criteria.
 func CollectMetrics(ctx context.Context, provider metrics.Metrics, query metrics.Query, offset time.Duration, healthCriteria []config.Metric) ([]float64, error) {
+	logger := util.LoggerFromContext(ctx)
+	logger.Debug("start collecting metrics")
 	var values []float64
 	for _, criteria := range healthCriteria {
 		var value float64
@@ -117,21 +133,28 @@ func latency(ctx context.Context, provider metrics.Metrics, query metrics.Query,
 		return 0, errors.Wrap(err, "invalid percentile")
 	}
 
+	logger := util.LoggerFromContext(ctx).WithField("percentile", percentile)
+	logger.Debug("querying for latency metrics")
 	latency, err := provider.Latency(ctx, query, offset, alignerReducer)
 	if err != nil {
 		return 0, errors.Wrap(err, "failed to get latency metrics")
 	}
+	logger.WithField("value", latency).Debug("latency successfully retrieved")
 
 	return latency, nil
 }
 
 // errorRatePercent returns the percentage of errors during the given offset.
 func errorRatePercent(ctx context.Context, provider metrics.Metrics, query metrics.Query, offset time.Duration) (float64, error) {
+	logger := util.LoggerFromContext(ctx)
+	logger.Debug("querying for error rate metrics")
 	rate, err := provider.ErrorRate(ctx, query, offset)
 	if err != nil {
 		return 0, errors.Wrap(err, "failed to get error rate metrics")
 	}
 
 	// Multiply rate by 100 to have a percentage.
-	return rate * 100, nil
+	rate *= 100
+	logger.WithField("value", rate).Debug("error rate successfully retrieved")
+	return rate, nil
 }
