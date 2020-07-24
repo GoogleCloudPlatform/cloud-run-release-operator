@@ -23,11 +23,11 @@ type Rollout struct {
 	runClient       runapi.Client
 	metricsProvider metrics.Metrics
 	service         *run.Service
-	project         string
 	serviceName     string
+	project         string
 	region          string
-	log             *logrus.Entry
 	strategy        *config.Strategy
+	log             *logrus.Entry
 
 	// Used to determine if candidate should become stable during update.
 	promoteToStable bool
