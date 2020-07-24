@@ -108,7 +108,7 @@ func main() {
 	}
 	logger.SetLevel(loggingLevel)
 
-	if isatty.IsTerminal(os.Stdout.Fd()) {
+	if !isatty.IsTerminal(os.Stdout.Fd()) {
 		serviceName := os.Getenv("K_SERVICE")
 		if serviceName == "" {
 			serviceName = "cloud-run-release-operator"
