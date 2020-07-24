@@ -19,10 +19,10 @@ func ContextWithLogger(ctx context.Context, logger *logrus.Entry) context.Contex
 
 // LoggerFromContext returns the logger from the context.
 func LoggerFromContext(ctx context.Context) *logrus.Entry {
-	logger := ctx.Value(loggerKey).(*logrus.Entry)
+	logger := ctx.Value(loggerKey)
 	if logger == nil {
 		logger = logrus.NewEntry(logrus.New())
 	}
 
-	return logger
+	return logger.(*logrus.Entry)
 }
