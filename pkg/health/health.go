@@ -2,7 +2,6 @@ package health
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/metrics"
@@ -10,21 +9,28 @@ import (
 	"github.com/pkg/errors"
 )
 
+// DiagnosisResult is a possible result after a diagnosis.
+type DiagnosisResult int32
+
+// Possible diagnosis results.
+const (
+	Unknown      DiagnosisResult = 0
+	Inconclusive DiagnosisResult = 1
+	Healthy      DiagnosisResult = 2
+	Unhealthy    DiagnosisResult = 3
+)
+
 // Diagnosis is the information about the health of the revision.
 type Diagnosis struct {
-	EnoughRequests     bool
-	CheckResults       []*CheckResult
-	FailedCheckResults []*CheckResult
-	IsHealthy          bool
+	OverallResult DiagnosisResult
+	CheckResults  []*CheckResult
 }
 
 // CheckResult is information about a metrics criteria check.
 type CheckResult struct {
-	MetricsType   config.MetricsCheck
-	MinOrMaxValue interface{}
-	ActualValue   interface{}
+	Threshold     float64
+	ActualValue   float64
 	IsCriteriaMet bool
-	Reason        string
 }
 
 // Diagnose attempts to determine the health of a revision.
@@ -42,33 +48,29 @@ func Diagnose(ctx context.Context, provider metrics.Metrics, query metrics.Query
 		return nil, errors.Wrap(err, "could not collect metrics")
 	}
 
-	isHealthy := true
-	var results, failedResults []*CheckResult
+	overallResult := Healthy
+	var results []*CheckResult
 	for i, criteria := range healthCriteria {
-		result := determineResult(criteria.Type, criteria.Min, criteria.Max, metricsValues[i])
+		result := determineResult(criteria.Type, criteria.Threshold, metricsValues[i])
 		results = append(results, result)
 
 		if !result.IsCriteriaMet {
-			isHealthy = false
-			failedResults = append(failedResults, result)
+			overallResult = Unhealthy
 		}
 	}
 
 	return &Diagnosis{
-		EnoughRequests:     true,
-		CheckResults:       results,
-		FailedCheckResults: failedResults,
-		IsHealthy:          isHealthy,
+		OverallResult: overallResult,
+		CheckResults:  results,
 	}, nil
 }
 
 // CollectMetrics returns an array of values collected for each of the specified
 // metrics criteria.
-func CollectMetrics(ctx context.Context, provider metrics.Metrics, query metrics.Query, offset time.Duration, healthCriteria []config.Metric) ([]interface{}, error) {
-
-	var values []interface{}
+func CollectMetrics(ctx context.Context, provider metrics.Metrics, query metrics.Query, offset time.Duration, healthCriteria []config.Metric) ([]float64, error) {
+	var values []float64
 	for _, criteria := range healthCriteria {
-		var value interface{}
+		var value float64
 		var err error
 
 		switch criteria.Type {
@@ -76,7 +78,7 @@ func CollectMetrics(ctx context.Context, provider metrics.Metrics, query metrics
 			value, err = latency(ctx, provider, query, offset, criteria.Percentile)
 			break
 		case config.ErrorRateMetricsCheck:
-			value, err = errorRate(ctx, provider, query, offset)
+			value, err = errorRatePercent(ctx, provider, query, offset)
 			break
 		default:
 			return nil, errors.Errorf("unimplemented metrics %q", criteria.Type)
@@ -95,39 +97,16 @@ func CollectMetrics(ctx context.Context, provider metrics.Metrics, query metrics
 //
 // The returned value also includes a string with details of why the criteria
 // was met or not.
-func determineResult(metricsType config.MetricsCheck, min interface{}, max interface{}, actualValue interface{}) *CheckResult {
-	result := &CheckResult{MetricsType: metricsType, ActualValue: actualValue}
+func determineResult(metricsType config.MetricsCheck, threshold float64, actualValue float64) *CheckResult {
+	result := &CheckResult{ActualValue: actualValue, Threshold: threshold}
 
-	switch metricsType {
-	case config.LatencyMetricsCheck:
-		actual := actualValue.(float64)
-		reasonFormat := "actual value %.2f is %s than max allowed latency %.2f"
-
-		if actual <= max.(float64) {
-			result.IsCriteriaMet = true
-			result.Reason = fmt.Sprintf(reasonFormat, actual, "less or equal", max)
-		} else {
-			result.IsCriteriaMet = false
-			result.Reason = fmt.Sprintf(reasonFormat, actual, "greater", max)
-		}
-		result.MinOrMaxValue = max
-		break
-
-	case config.ErrorRateMetricsCheck:
-		actual := actualValue.(float64)
-		reasonFormat := "actual value %.2f is %s than max allowed error rate %.2f"
-
-		if actual <= max.(float64) {
-			result.IsCriteriaMet = true
-			result.Reason = fmt.Sprintf(reasonFormat, actual, "less or equal", max)
-		} else {
-			result.IsCriteriaMet = false
-			result.Reason = fmt.Sprintf(reasonFormat, actual, "greater", max)
-		}
-		result.MinOrMaxValue = max
-		break
+	// As of now, the supported health criteria (latency and error rate) need to
+	// be less than the threshold. So, this is sufficient for now but might need
+	// to change to a switch statement when criteria with a minimum threshold is
+	// added.
+	if actualValue <= threshold {
+		result.IsCriteriaMet = true
 	}
-
 	return result
 }
 
@@ -146,8 +125,8 @@ func latency(ctx context.Context, provider metrics.Metrics, query metrics.Query,
 	return latency, nil
 }
 
-// errorRate returns the percentage of errors during the given offset.
-func errorRate(ctx context.Context, provider metrics.Metrics, query metrics.Query, offset time.Duration) (float64, error) {
+// errorRatePercent returns the percentage of errors during the given offset.
+func errorRatePercent(ctx context.Context, provider metrics.Metrics, query metrics.Query, offset time.Duration) (float64, error) {
 	rate, err := provider.ErrorRate(ctx, query, offset)
 	if err != nil {
 		return 0, errors.Wrap(err, "failed to get error rate metrics")

@@ -2,7 +2,6 @@ package health_test
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -36,56 +35,45 @@ func TestDiagnose(t *testing.T) {
 			offset:      5 * time.Minute,
 			minRequests: 1000,
 			healthCriteria: []config.Metric{
-				{Type: config.LatencyMetricsCheck, Percentile: 99, Max: 750},
-				{Type: config.ErrorRateMetricsCheck, Max: 5},
+				{Type: config.LatencyMetricsCheck, Percentile: 99, Threshold: 750},
+				{Type: config.ErrorRateMetricsCheck, Threshold: 5},
 			},
 			expected: &health.Diagnosis{
-				EnoughRequests: true,
-				IsHealthy:      true,
+				OverallResult: health.Healthy,
 				CheckResults: []*health.CheckResult{
 					{
-						MetricsType:   config.LatencyMetricsCheck,
+						Threshold:     750.0,
 						ActualValue:   500.0,
-						MinOrMaxValue: 750.0,
 						IsCriteriaMet: true,
-						Reason:        fmt.Sprintf("actual value %.2f is less or equal than max allowed latency %.2f", 500.0, 750.0),
 					},
 					{
-						MetricsType:   config.ErrorRateMetricsCheck,
+						Threshold:     5.0,
 						ActualValue:   1.0,
-						MinOrMaxValue: 5.0,
 						IsCriteriaMet: true,
-						Reason:        fmt.Sprintf("actual value %.2f is less or equal than max allowed error rate %.2f", 1.0, 5.0),
 					},
 				},
 			},
 		},
 		{
-			name:        "barely healthy revision",
-			query:       metricsMocker.Query{},
-			offset:      5 * time.Minute,
-			minRequests: 1000,
+			name:   "barely healthy revision",
+			query:  metricsMocker.Query{},
+			offset: 5 * time.Minute,
 			healthCriteria: []config.Metric{
-				{Type: config.LatencyMetricsCheck, Percentile: 99, Max: 500},
-				{Type: config.ErrorRateMetricsCheck, Max: 1},
+				{Type: config.LatencyMetricsCheck, Percentile: 99, Threshold: 500},
+				{Type: config.ErrorRateMetricsCheck, Threshold: 1},
 			},
 			expected: &health.Diagnosis{
-				EnoughRequests: true,
-				IsHealthy:      true,
+				OverallResult: health.Healthy,
 				CheckResults: []*health.CheckResult{
 					{
-						MetricsType:   config.LatencyMetricsCheck,
+						Threshold:     500.0,
 						ActualValue:   500.0,
-						MinOrMaxValue: 500.0,
 						IsCriteriaMet: true,
-						Reason:        fmt.Sprintf("actual value %.2f is less or equal than max allowed latency %.2f", 500.0, 500.0),
 					},
 					{
-						MetricsType:   config.ErrorRateMetricsCheck,
+						Threshold:     1.0,
 						ActualValue:   1.0,
-						MinOrMaxValue: 1.0,
 						IsCriteriaMet: true,
-						Reason:        fmt.Sprintf("actual value %.2f is less or equal than max allowed error rate %.2f", 1.0, 1.0),
 					},
 				},
 			},
@@ -96,27 +84,15 @@ func TestDiagnose(t *testing.T) {
 			offset:      5 * time.Minute,
 			minRequests: 1000,
 			healthCriteria: []config.Metric{
-				{Type: config.LatencyMetricsCheck, Percentile: 99, Max: 499},
+				{Type: config.LatencyMetricsCheck, Percentile: 99, Threshold: 499},
 			},
 			expected: &health.Diagnosis{
-				EnoughRequests: true,
-				IsHealthy:      false,
+				OverallResult: health.Unhealthy,
 				CheckResults: []*health.CheckResult{
 					{
-						MetricsType:   config.LatencyMetricsCheck,
+						Threshold:     499.0,
 						ActualValue:   500.0,
-						MinOrMaxValue: 499.0,
 						IsCriteriaMet: false,
-						Reason:        fmt.Sprintf("actual value %.2f is greater than max allowed latency %.2f", 500.0, 499.0),
-					},
-				},
-				FailedCheckResults: []*health.CheckResult{
-					{
-						MetricsType:   config.LatencyMetricsCheck,
-						ActualValue:   500.0,
-						MinOrMaxValue: 499.0,
-						IsCriteriaMet: false,
-						Reason:        fmt.Sprintf("actual value %.2f is greater than max allowed latency %.2f", 500.0, 499.0),
 					},
 				},
 			},
@@ -127,27 +103,15 @@ func TestDiagnose(t *testing.T) {
 			offset:      5 * time.Minute,
 			minRequests: 1000,
 			healthCriteria: []config.Metric{
-				{Type: config.ErrorRateMetricsCheck, Max: 0.95},
+				{Type: config.ErrorRateMetricsCheck, Threshold: 0.95},
 			},
 			expected: &health.Diagnosis{
-				EnoughRequests: true,
-				IsHealthy:      false,
+				OverallResult: health.Unhealthy,
 				CheckResults: []*health.CheckResult{
 					{
-						MetricsType:   config.ErrorRateMetricsCheck,
+						Threshold:     0.95,
 						ActualValue:   1.0,
-						MinOrMaxValue: 0.95,
 						IsCriteriaMet: false,
-						Reason:        fmt.Sprintf("actual value %.2f is greater than max allowed error rate %.2f", 1.0, 0.95),
-					},
-				},
-				FailedCheckResults: []*health.CheckResult{
-					{
-						MetricsType:   config.ErrorRateMetricsCheck,
-						ActualValue:   1.0,
-						MinOrMaxValue: 0.95,
-						IsCriteriaMet: false,
-						Reason:        fmt.Sprintf("actual value %.2f is greater than max allowed error rate %.2f", 1.0, 0.95),
 					},
 				},
 			},
@@ -157,8 +121,8 @@ func TestDiagnose(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			ctx := context.Background()
-			isHealthy, _ := health.Diagnose(ctx, metricsMock, test.query, test.offset, test.minRequests, test.healthCriteria)
-			assert.Equal(t, test.expected, isHealthy)
+			diagnosis, _ := health.Diagnose(ctx, metricsMock, test.query, test.offset, test.minRequests, test.healthCriteria)
+			assert.Equal(t, test.expected, diagnosis)
 		})
 	}
 }
