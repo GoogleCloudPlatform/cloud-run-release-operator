@@ -8,6 +8,7 @@ import (
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/metrics"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/util"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 
 	// TODO: Migrate to cloud.google.com/go/monitoring/apiv3/v2 once RPC for MQL
 	// query is added (https://cloud.google.com/monitoring/api/ref_v3/rest/v3/projects.timeSeries/query).
@@ -47,30 +48,35 @@ func NewAPIClient(ctx context.Context, project string) (*API, error) {
 
 // RequestCount count returns the number of requests for the given offset and
 // query.
-func (a *API) RequestCount(ctx context.Context, query Query, offset time.Duration) (int64, error) {
+func (a *API) RequestCount(ctx context.Context, query metrics.Query, offset time.Duration) (int64, error) {
 	logger := util.LoggerFromContext(ctx)
 	query = addFilterToQuery(query, "metric.type", requestCount)
 	endTime := time.Now()
+	endTimeString := endTime.Format(time.RFC3339Nano)
 	startTime := endTime.Add(-1 * offset)
+	startTimeString := startTime.Format(time.RFC3339Nano)
 	offsetString := fmt.Sprintf("%fs", offset.Seconds())
 
 	req := a.MetricClient.Projects.TimeSeries.List("projects/" + a.Project).
 		Filter(query.Query()).
-		IntervalStartTime(startTime.Format(time.RFC3339Nano)).
-		IntervalEndTime(endTime.Format(time.RFC3339Nano)).
+		IntervalStartTime(startTimeString).
+		IntervalEndTime(endTimeString).
 		AggregationAlignmentPeriod(offsetString).
 		AggregationPerSeriesAligner("ALIGN_DELTA").
 		AggregationGroupByFields("resource.labels.service_name").
 		AggregationCrossSeriesReducer("REDUCE_SUM")
 
-	logger.Debug("querying request count from Cloud Monitoring API")
+	logger.WithFields(logrus.Fields{
+		"intervalStartTime": startTimeString,
+		"intervalEndTime":   endTimeString,
+	}).Debug("querying request count from Cloud Monitoring API")
 	resp, err := req.Do()
 	if err != nil {
 		return 0, errors.Wrap(err, "error when retrieving time series")
 	}
 	if len(resp.ExecutionErrors) != 0 {
 		for _, execError := range resp.ExecutionErrors {
-			loggerWith.WithField("message", execError.Message).Warn("execution error occurred")
+			logger.WithField("message", execError.Message).Warn("execution error occurred")
 		}
 		return 0, errors.New("execution errors occurred")
 	}
