@@ -10,6 +10,7 @@ import (
 
 	// TODO: Migrate to cloud.google.com/go/monitoring/apiv3/v2 once RPC for MQL
 	// query is added (https://cloud.google.com/monitoring/api/ref_v3/rest/v3/projects.timeSeries/query).
+
 	monitoring "google.golang.org/api/monitoring/v3"
 )
 
@@ -49,38 +50,37 @@ func (a *API) RequestCount(ctx context.Context, query Query, offset time.Duratio
 	query = addFilterToQuery(query, "metric.type", requestCount)
 	endTime := time.Now()
 	startTime := endTime.Add(-1 * offset)
+	offsetString := fmt.Sprintf("%fs", offset.Seconds())
 
-	it := a.MetricClient.ListTimeSeries(ctx, &monitoringpb.ListTimeSeriesRequest{
-		Name:   "projects/" + a.Project,
-		Filter: query.Query(),
-		Interval: &monitoringpb.TimeInterval{
-			StartTime: timestamp.New(startTime),
-			EndTime:   timestamp.New(endTime),
-		},
-		Aggregation: &monitoringpb.Aggregation{
-			AlignmentPeriod:    duration.New(offset),
-			PerSeriesAligner:   monitoringpb.Aggregation_ALIGN_DELTA,
-			GroupByFields:      []string{"resource.labels.service_name"},
-			CrossSeriesReducer: monitoringpb.Aggregation_REDUCE_SUM,
-		},
-	})
+	req := a.MetricClient.Projects.TimeSeries.List("projects/" + a.Project).
+		Filter(query.Query()).
+		IntervalStartTime(startTime.Format(time.RFC3339Nano)).
+		IntervalEndTime(endTime.Format(time.RFC3339Nano)).
+		AggregationAlignmentPeriod(offsetString).
+		AggregationPerSeriesAligner("ALIGN_DELTA").
+		AggregationGroupByFields("resource.labels.service_name").
+		AggregationCrossSeriesReducer("REDUCE_SUM")
 
-	// The request count is aggregated for the entire service, so only one time
-	// series and a point is returned. So, there's no need for a loop.
-	series, err := it.Next()
-
-	// This happens when no request was made during the given offset.
-	if err == iterator.Done {
-		return 0, nil
-	}
+	resp, err := req.Do()
 	if err != nil {
 		return 0, errors.Wrap(err, "error when retrieving time series")
 	}
+	if len(resp.ExecutionErrors) != 0 {
+		return 0, errors.Errorf("execution errors occurred: %v", resp.ExecutionErrors)
+	}
+
+	// This happens when no request was made during the given offset.
+	if len(resp.TimeSeries) == 0 {
+		return 0, nil
+	}
+
+	// The request count is aggregated for the entire service, so only one time
+	// series and a point is returned. There's no need for a loop.
+	series := resp.TimeSeries[0]
 	if len(series.Points) == 0 {
 		return 0, errors.New("no data point was retrieved")
 	}
-
-	return series.Points[0].GetValue().GetInt64Value(), nil
+	return *(series.Points[0].Value.Int64Value), nil
 }
 
 // Latency returns the latency for the resource matching the filter.
