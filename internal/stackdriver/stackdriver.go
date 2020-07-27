@@ -118,6 +118,8 @@ func (p *Provider) Latency(ctx context.Context, query metrics.Query, offset time
 		"intervalStartTime": startTimeString,
 		"intervalEndTime":   endTimeString,
 		"metrics":           "latency",
+		"aligner":           aligner,
+		"reducer":           reducer,
 	})
 	logger.Debug("querying Cloud Monitoring API")
 	timeSeries, err := makeRequestForTimeSeries(logger, req)
@@ -159,7 +161,7 @@ func (p *Provider) ErrorRate(ctx context.Context, query metrics.Query, offset ti
 	logger := util.LoggerFromContext(ctx).WithFields(logrus.Fields{
 		"intervalStartTime": startTimeString,
 		"intervalEndTime":   endTimeString,
-		"metrics":           "error rate",
+		"metrics":           "error-rate",
 	})
 	logger.Debug("querying Cloud Monitoring API")
 	timeSeries, err := makeRequestForTimeSeries(logger, req)
