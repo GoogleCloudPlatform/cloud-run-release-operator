@@ -49,7 +49,6 @@ func NewProvider(ctx context.Context, project string) (*Provider, error) {
 // RequestCount count returns the number of requests for the given offset and
 // query.
 func (p *Provider) RequestCount(ctx context.Context, query metrics.Query, offset time.Duration) (int64, error) {
-	logger := util.LoggerFromContext(ctx)
 	query = addFilterToQuery(query, "metric.type", requestCount)
 	endTime := time.Now()
 	endTimeString := endTime.Format(time.RFC3339Nano)
@@ -66,29 +65,24 @@ func (p *Provider) RequestCount(ctx context.Context, query metrics.Query, offset
 		AggregationGroupByFields("resource.labels.service_name").
 		AggregationCrossSeriesReducer("REDUCE_SUM")
 
-	logger.WithFields(logrus.Fields{
+	logger := util.LoggerFromContext(ctx).WithFields(logrus.Fields{
 		"intervalStartTime": startTimeString,
 		"intervalEndTime":   endTimeString,
-	}).Debug("querying request count from Cloud Monitoring API")
-	resp, err := req.Do()
+		"metrics":           "request-count",
+	})
+	logger.Debug("querying Cloud Monitoring API")
+	timeSeries, err := makeRequestForTimeSeries(logger, req)
 	if err != nil {
-		return 0, errors.Wrap(err, "error when retrieving time series")
-	}
-	if len(resp.ExecutionErrors) != 0 {
-		for _, execError := range resp.ExecutionErrors {
-			logger.WithField("message", execError.Message).Warn("execution error occurred")
-		}
-		return 0, errors.New("execution errors occurred")
+		return 0, errors.Wrap(err, "error when querying for time series")
 	}
 
 	// This happens when no request was made during the given offset.
-	if len(resp.TimeSeries) == 0 {
+	if len(timeSeries) == 0 {
 		return 0, nil
 	}
-
 	// The request count is aggregated for the entire service, so only one time
 	// series and a point is returned. There's no need for a loop.
-	series := resp.TimeSeries[0]
+	series := timeSeries[0]
 	if len(series.Points) == 0 {
 		return 0, errors.New("no data point was retrieved")
 	}
