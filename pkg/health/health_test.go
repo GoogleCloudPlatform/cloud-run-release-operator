@@ -40,7 +40,7 @@ func TestDiagnose(t *testing.T) {
 			},
 			expected: &health.Diagnosis{
 				OverallResult: health.Healthy,
-				CheckResults: []*health.CheckResult{
+				CheckResults: []health.CheckResult{
 					{
 						Threshold:     750.0,
 						ActualValue:   500.0,
@@ -64,7 +64,7 @@ func TestDiagnose(t *testing.T) {
 			},
 			expected: &health.Diagnosis{
 				OverallResult: health.Healthy,
-				CheckResults: []*health.CheckResult{
+				CheckResults: []health.CheckResult{
 					{
 						Threshold:     500.0,
 						ActualValue:   500.0,
@@ -88,7 +88,7 @@ func TestDiagnose(t *testing.T) {
 			},
 			expected: &health.Diagnosis{
 				OverallResult: health.Unhealthy,
-				CheckResults: []*health.CheckResult{
+				CheckResults: []health.CheckResult{
 					{
 						Threshold:     499.0,
 						ActualValue:   500.0,
@@ -107,7 +107,7 @@ func TestDiagnose(t *testing.T) {
 			},
 			expected: &health.Diagnosis{
 				OverallResult: health.Unhealthy,
-				CheckResults: []*health.CheckResult{
+				CheckResults: []health.CheckResult{
 					{
 						Threshold:     0.95,
 						ActualValue:   1.0,

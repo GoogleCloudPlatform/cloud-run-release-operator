@@ -12,20 +12,20 @@ import (
 )
 
 // DiagnosisResult is a possible result after a diagnosis.
-type DiagnosisResult int32
+type DiagnosisResult int
 
 // Possible diagnosis results.
 const (
-	Unknown      DiagnosisResult = 0
-	Inconclusive DiagnosisResult = 1
-	Healthy      DiagnosisResult = 2
-	Unhealthy    DiagnosisResult = 3
+	Unknown DiagnosisResult = iota
+	Inconclusive
+	Healthy
+	Unhealthy
 )
 
 // Diagnosis is the information about the health of the revision.
 type Diagnosis struct {
 	OverallResult DiagnosisResult
-	CheckResults  []*CheckResult
+	CheckResults  []CheckResult
 }
 
 // CheckResult is information about a metrics criteria check.
@@ -42,7 +42,7 @@ type CheckResult struct {
 //
 // Otherwise, all metrics criteria are checked to determine if the revision is
 // healthy.
-func Diagnose(ctx context.Context, provider metrics.Metrics, query metrics.Query,
+func Diagnose(ctx context.Context, provider metrics.Provider, query metrics.Query,
 	offset time.Duration, minRequests int64, healthCriteria []config.Metric) (*Diagnosis, error) {
 
 	logger := util.LoggerFromContext(ctx)
@@ -52,25 +52,24 @@ func Diagnose(ctx context.Context, provider metrics.Metrics, query metrics.Query
 	}
 
 	overallResult := Healthy
-	var results []*CheckResult
+	var results []CheckResult
 	for i, criteria := range healthCriteria {
+		logger := logger.WithFields(logrus.Fields{
+			"metricsType": criteria.Type,
+			"percentile":  criteria.Percentile,
+			"threshold":   criteria.Threshold,
+			"actualValue": metricsValues[i],
+		})
+
 		result := determineResult(criteria.Type, criteria.Threshold, metricsValues[i])
 		results = append(results, result)
-
-		if !result.IsCriteriaMet {
-			overallResult = Unhealthy
-
-			logger := logger.WithFields(logrus.Fields{
-				"metricsType": criteria.Type,
-				"threshold":   criteria.Threshold,
-				"actualValue": result.ActualValue,
-			})
-			// If criteria is a latency, we want to log the percentile as well
-			if criteria.Type == config.LatencyMetricsCheck {
-				logger = logger.WithField("percentile", criteria.Percentile)
-			}
-			logger.Debug("criteria was not met")
+		if result.IsCriteriaMet {
+			logger.Debug("met criteria")
+			continue
 		}
+
+		overallResult = Unhealthy
+		logger.Debug("unmet criteria")
 	}
 
 	return &Diagnosis{
@@ -81,7 +80,7 @@ func Diagnose(ctx context.Context, provider metrics.Metrics, query metrics.Query
 
 // CollectMetrics returns an array of values collected for each of the specified
 // metrics criteria.
-func CollectMetrics(ctx context.Context, provider metrics.Metrics, query metrics.Query, offset time.Duration, healthCriteria []config.Metric) ([]float64, error) {
+func CollectMetrics(ctx context.Context, provider metrics.Provider, query metrics.Query, offset time.Duration, healthCriteria []config.Metric) ([]float64, error) {
 	logger := util.LoggerFromContext(ctx)
 	logger.Debug("start collecting metrics")
 	var values []float64
@@ -113,8 +112,8 @@ func CollectMetrics(ctx context.Context, provider metrics.Metrics, query metrics
 //
 // The returned value also includes a string with details of why the criteria
 // was met or not.
-func determineResult(metricsType config.MetricsCheck, threshold float64, actualValue float64) *CheckResult {
-	result := &CheckResult{ActualValue: actualValue, Threshold: threshold}
+func determineResult(metricsType config.MetricsCheck, threshold float64, actualValue float64) CheckResult {
+	result := CheckResult{ActualValue: actualValue, Threshold: threshold}
 
 	// As of now, the supported health criteria (latency and error rate) need to
 	// be less than the threshold. So, this is sufficient for now but might need
@@ -127,10 +126,10 @@ func determineResult(metricsType config.MetricsCheck, threshold float64, actualV
 }
 
 // latency returns the latency for the given offset and percentile.
-func latency(ctx context.Context, provider metrics.Metrics, query metrics.Query, offset time.Duration, percentile float64) (float64, error) {
+func latency(ctx context.Context, provider metrics.Provider, query metrics.Query, offset time.Duration, percentile float64) (float64, error) {
 	alignerReducer, err := metrics.PercentileToAlignReduce(percentile)
 	if err != nil {
-		return 0, errors.Wrap(err, "invalid percentile")
+		return 0, errors.Wrap(err, "failed to parse percentile")
 	}
 
 	logger := util.LoggerFromContext(ctx).WithField("percentile", percentile)
@@ -145,7 +144,7 @@ func latency(ctx context.Context, provider metrics.Metrics, query metrics.Query,
 }
 
 // errorRatePercent returns the percentage of errors during the given offset.
-func errorRatePercent(ctx context.Context, provider metrics.Metrics, query metrics.Query, offset time.Duration) (float64, error) {
+func errorRatePercent(ctx context.Context, provider metrics.Provider, query metrics.Query, offset time.Duration) (float64, error) {
 	logger := util.LoggerFromContext(ctx)
 	logger.Debug("querying for error rate metrics")
 	rate, err := provider.ErrorRate(ctx, query, offset)
