@@ -7,7 +7,7 @@
 // Region, Service, Request Count, Error Rate, Latency P99, Latency P95, Latency P50
 //
 // Example
-// us-east1, tester, 1000, 0.001, 1000, 750, 500
+// us-east1, tester, 1000, 0.01, 1000, 750, 500
 package sheets
 
 import (
