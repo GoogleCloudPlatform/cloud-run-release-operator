@@ -21,6 +21,7 @@ type ServiceRecord struct {
 
 // Rollout is the rollout manager.
 type Rollout struct {
+	ctx             context.Context
 	metricsProvider metrics.Provider
 	service         *run.Service
 	serviceName     string
@@ -28,7 +29,6 @@ type Rollout struct {
 	region          string
 	strategy        *config.Strategy
 	runClient       runapi.Client
-	ctx             context.Context
 	log             *logrus.Entry
 
 	// Used to determine if candidate should become stable during update.
@@ -43,18 +43,18 @@ const (
 )
 
 // New returns a new rollout manager.
-func New(metricsProvider metrics.Provider, svcRecord *ServiceRecord, strategy *config.Strategy) *Rollout {
+func New(ctx context.Context, metricsProvider metrics.Provider, svcRecord *ServiceRecord, strategy *config.Strategy) *Rollout {
 	logger := logrus.New()
 	logger.SetOutput(ioutil.Discard)
 
 	return &Rollout{
+		ctx:             ctx,
 		metricsProvider: metricsProvider,
 		service:         svcRecord.Service,
 		serviceName:     svcRecord.Metadata.Name,
 		project:         svcRecord.Project,
 		region:          svcRecord.Region,
 		strategy:        strategy,
-		ctx:             context.TODO(),
 		log:             logrus.NewEntry(logrus.New()),
 	}
 }
@@ -62,12 +62,6 @@ func New(metricsProvider metrics.Provider, svcRecord *ServiceRecord, strategy *c
 // WithClient updates the client in the rollout instance.
 func (r *Rollout) WithClient(client runapi.Client) *Rollout {
 	r.runClient = client
-	return r
-}
-
-// WithContext updates the context in the rollout instance.
-func (r *Rollout) WithContext(ctx context.Context) *Rollout {
-	r.ctx = ctx
 	return r
 }
 
