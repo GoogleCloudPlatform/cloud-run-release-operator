@@ -11,79 +11,65 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// DiagnosisResult is a possible result after a diagnosis.
-type DiagnosisResult int
+// Diagnosis is a possible result after a diagnosis.
+type Diagnosis int
 
 // Possible diagnosis results.
 const (
-	Unknown DiagnosisResult = iota
+	Unknown Diagnosis = iota
 	Inconclusive
 	Healthy
 	Unhealthy
 )
 
-// Diagnosis is the information about the health of the revision.
-type Diagnosis struct {
-	OverallResult DiagnosisResult
-	CheckResults  []CheckResult
-}
-
-// CheckResult is information about a metrics criteria check.
-type CheckResult struct {
-	Threshold     float64
-	ActualValue   float64
-	IsCriteriaMet bool
-}
-
 // Diagnose attempts to determine the health of a revision.
 //
-// If the minimum number of requests is not met, then health cannot be
-// determined and Diagnosis.EnoughRequests is set to false.
+// If no health criteria is specified or the size of the health criteria and the
+// actual values are not the same, the diagnosis is Unknown and an error is
+// returned.
 //
-// Otherwise, all metrics criteria are checked to determine if the revision is
-// healthy.
-func Diagnose(ctx context.Context, provider metrics.Provider, offset time.Duration,
-	minRequests int64, healthCriteria []config.Metric) (*Diagnosis, error) {
-
+// If the minimum number of requests is not met, then health cannot be
+// determined and diagnosis is Inconclusive.
+//
+// Otherwise, all metrics criteria are checked to determine whether the revision
+// is healthy or not.
+func Diagnose(ctx context.Context, healthCriteria []config.Metric, actualValues []float64) (Diagnosis, error) {
 	logger := util.LoggerFromContext(ctx)
-	metricsValues, err := CollectMetrics(ctx, provider, offset, healthCriteria)
-	if err != nil {
-		return nil, errors.Wrap(err, "could not collect metrics")
+	if len(healthCriteria) != len(actualValues) {
+		return Unknown, errors.New("the size of health criteria is not the same to the size of the actual metrics values")
+	}
+	if len(healthCriteria) == 0 {
+		return Unknown, errors.New("health criteria must be specified")
 	}
 
-	overallResult := Healthy
-	var results []CheckResult
-	for i, criteria := range healthCriteria {
+	diagnosis := Healthy
+	for i, value := range actualValues {
+		criteria := healthCriteria[i]
 		logger := logger.WithFields(logrus.Fields{
 			"metricsType": criteria.Type,
 			"percentile":  criteria.Percentile,
 			"threshold":   criteria.Threshold,
-			"actualValue": metricsValues[i],
+			"actualValue": value,
 		})
 
-		result := determineResult(criteria.Type, criteria.Threshold, metricsValues[i])
-		results = append(results, result)
-		if result.IsCriteriaMet {
-			logger.Debug("met criteria")
+		if !isCriteriaMet(criteria.Type, criteria.Threshold, value) {
+			logger.Debug("unmet criterion")
+			diagnosis = Unhealthy
 			continue
 		}
-
-		overallResult = Unhealthy
-		logger.Debug("unmet criteria")
+		logger.Debug("met criterion")
 	}
 
-	return &Diagnosis{
-		OverallResult: overallResult,
-		CheckResults:  results,
-	}, nil
+	return diagnosis, nil
 }
 
-// CollectMetrics returns an array of values collected for each of the specified
-// metrics criteria.
+// CollectMetrics gets a metrics value for each of the given health criteria and
+// returns a result for each criterion.
 func CollectMetrics(ctx context.Context, provider metrics.Provider, offset time.Duration, healthCriteria []config.Metric) ([]float64, error) {
-	logger := util.LoggerFromContext(ctx)
-	logger.Debug("start collecting metrics")
-	var values []float64
+	if len(healthCriteria) == 0 {
+		return nil, errors.New("health criteria must be specified")
+	}
+	var results []float64
 	for _, criteria := range healthCriteria {
 		var value float64
 		var err error
@@ -102,27 +88,22 @@ func CollectMetrics(ctx context.Context, provider metrics.Provider, offset time.
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to obtain metrics %q", criteria.Type)
 		}
-		values = append(values, value)
+		results = append(results, value)
 	}
 
-	return values, nil
+	return results, nil
 }
 
-// determineResult concludes if metrics criteria was met.
-//
-// The returned value also includes a string with details of why the criteria
-// was met or not.
-func determineResult(metricsType config.MetricsCheck, threshold float64, actualValue float64) CheckResult {
-	result := CheckResult{ActualValue: actualValue, Threshold: threshold}
-
+// isCriteriaMet concludes if metrics criteria was met.
+func isCriteriaMet(metricsType config.MetricsCheck, threshold float64, actualValue float64) bool {
 	// As of now, the supported health criteria (latency and error rate) need to
 	// be less than the threshold. So, this is sufficient for now but might need
 	// to change to a switch statement when criteria with a minimum threshold is
 	// added.
 	if actualValue <= threshold {
-		result.IsCriteriaMet = true
+		return true
 	}
-	return result
+	return false
 }
 
 // latency returns the latency for the given offset and percentile.

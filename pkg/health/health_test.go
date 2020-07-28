@@ -12,7 +12,78 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestDiagnose(t *testing.T) {
+func TestDiagnosis(t *testing.T) {
+	tests := []struct {
+		name           string
+		healthCriteria []config.Metric
+		results        []float64
+		expected       health.Diagnosis
+		shouldErr      bool
+	}{
+		{
+			name: "healthy revision",
+			healthCriteria: []config.Metric{
+				{Type: config.LatencyMetricsCheck, Percentile: 99, Threshold: 750},
+				{Type: config.ErrorRateMetricsCheck, Threshold: 5},
+			},
+			results:  []float64{500.0, 1.0},
+			expected: health.Healthy,
+		},
+		{
+			name: "barely healthy revision",
+			healthCriteria: []config.Metric{
+				{Type: config.LatencyMetricsCheck, Percentile: 99, Threshold: 500},
+				{Type: config.ErrorRateMetricsCheck, Threshold: 1},
+			},
+			results:  []float64{500.0, 1.0},
+			expected: health.Healthy,
+		},
+		{
+			name: "unhealthy revision, miss latency",
+			healthCriteria: []config.Metric{
+				{Type: config.LatencyMetricsCheck, Percentile: 99, Threshold: 499},
+			},
+			results:  []float64{500.0},
+			expected: health.Unhealthy,
+		},
+		{
+			name: "unhealthy revision, miss error rate",
+			healthCriteria: []config.Metric{
+				{Type: config.ErrorRateMetricsCheck, Threshold: 0.95},
+			},
+			results:  []float64{1.0},
+			expected: health.Unhealthy,
+		},
+		{
+			name: "should err, different sizes for criteria and results",
+			healthCriteria: []config.Metric{
+				{Type: config.ErrorRateMetricsCheck, Threshold: 0.95},
+			},
+			results:   []float64{},
+			shouldErr: true,
+		},
+		{
+			name:      "should err, empty health criteria",
+			shouldErr: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := context.Background()
+			diagnosis, err := health.Diagnose(ctx, test.healthCriteria, test.results)
+			if test.shouldErr {
+				assert.NotNil(t, err)
+			} else {
+				assert.Equal(t, test.expected, diagnosis)
+			}
+		})
+	}
+}
+
+// TestCollectMetrics tests that the health.CollectMetrics returns the correct
+// values using the metrics provider.
+func TestCollectMetrics(t *testing.T) {
 	metricsMock := &metricsMocker.Metrics{}
 	metricsMock.LatencyFn = func(ctx context.Context, offset time.Duration, alignReduceType metrics.AlignReduce) (float64, error) {
 		return 500, nil
@@ -21,103 +92,15 @@ func TestDiagnose(t *testing.T) {
 		return 0.01, nil
 	}
 
-	tests := []struct {
-		name           string
-		offset         time.Duration
-		minRequests    int64
-		healthCriteria []config.Metric
-		expected       *health.Diagnosis
-	}{
-		{
-			name:        "healthy revision",
-			offset:      5 * time.Minute,
-			minRequests: 1000,
-			healthCriteria: []config.Metric{
-				{Type: config.LatencyMetricsCheck, Percentile: 99, Threshold: 750},
-				{Type: config.ErrorRateMetricsCheck, Threshold: 5},
-			},
-			expected: &health.Diagnosis{
-				OverallResult: health.Healthy,
-				CheckResults: []health.CheckResult{
-					{
-						Threshold:     750.0,
-						ActualValue:   500.0,
-						IsCriteriaMet: true,
-					},
-					{
-						Threshold:     5.0,
-						ActualValue:   1.0,
-						IsCriteriaMet: true,
-					},
-				},
-			},
-		},
-		{
-			name:   "barely healthy revision",
-			offset: 5 * time.Minute,
-			healthCriteria: []config.Metric{
-				{Type: config.LatencyMetricsCheck, Percentile: 99, Threshold: 500},
-				{Type: config.ErrorRateMetricsCheck, Threshold: 1},
-			},
-			expected: &health.Diagnosis{
-				OverallResult: health.Healthy,
-				CheckResults: []health.CheckResult{
-					{
-						Threshold:     500.0,
-						ActualValue:   500.0,
-						IsCriteriaMet: true,
-					},
-					{
-						Threshold:     1.0,
-						ActualValue:   1.0,
-						IsCriteriaMet: true,
-					},
-				},
-			},
-		},
-		{
-			name:        "unhealthy revision, miss latency",
-			offset:      5 * time.Minute,
-			minRequests: 1000,
-			healthCriteria: []config.Metric{
-				{Type: config.LatencyMetricsCheck, Percentile: 99, Threshold: 499},
-			},
-			expected: &health.Diagnosis{
-				OverallResult: health.Unhealthy,
-				CheckResults: []health.CheckResult{
-					{
-						Threshold:     499.0,
-						ActualValue:   500.0,
-						IsCriteriaMet: false,
-					},
-				},
-			},
-		},
-		{
-			name:        "unhealthy revision, miss error rate",
-			offset:      5 * time.Minute,
-			minRequests: 1000,
-			healthCriteria: []config.Metric{
-				{Type: config.ErrorRateMetricsCheck, Threshold: 0.95},
-			},
-			expected: &health.Diagnosis{
-				OverallResult: health.Unhealthy,
-				CheckResults: []health.CheckResult{
-					{
-						Threshold:     0.95,
-						ActualValue:   1.0,
-						IsCriteriaMet: false,
-					},
-				},
-			},
-		},
+	ctx := context.Background()
+	offset := 5 * time.Minute
+	healthCriteria := []config.Metric{
+		{Type: config.LatencyMetricsCheck, Percentile: 99},
+		{Type: config.ErrorRateMetricsCheck},
 	}
+	expected := []float64{500.0, 1.0}
+	results, _ := health.CollectMetrics(ctx, metricsMock, offset, healthCriteria)
+	assert.Equal(t, expected, results)
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			ctx := context.Background()
-			diagnosis, _ := health.Diagnose(ctx, metricsMock, test.offset, test.minRequests, test.healthCriteria)
-			assert.Equal(t, test.expected, diagnosis)
-		})
-	}
+	assert.Equal(t, expected, results)
 }
