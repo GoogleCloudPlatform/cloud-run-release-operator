@@ -16,9 +16,7 @@ import (
 )
 
 // query is the filter used to retrieve metrics data.
-type query struct {
-	filter string
-}
+type query string
 
 // Provider is a metrics provider for Cloud Monitoring.
 type Provider struct {
@@ -66,7 +64,7 @@ func (p *Provider) RequestCount(ctx context.Context, offset time.Duration) (int6
 	offsetString := fmt.Sprintf("%fs", offset.Seconds())
 
 	req := p.metricsClient.Projects.TimeSeries.List("projects/" + p.project).
-		Filter(query.filter).
+		Filter(string(query)).
 		IntervalStartTime(startTimeString).
 		IntervalEndTime(endTimeString).
 		AggregationAlignmentPeriod(offsetString).
@@ -109,7 +107,7 @@ func (p *Provider) Latency(ctx context.Context, offset time.Duration, alignReduc
 	offsetString := fmt.Sprintf("%fs", offset.Seconds())
 
 	req := p.metricsClient.Projects.TimeSeries.List("projects/" + p.project).
-		Filter(query.filter).
+		Filter(string(query)).
 		IntervalStartTime(startTimeString).
 		IntervalEndTime(endTimeString).
 		AggregationAlignmentPeriod(offsetString).
@@ -153,7 +151,7 @@ func (p *Provider) ErrorRate(ctx context.Context, offset time.Duration) (float64
 	offsetString := fmt.Sprintf("%fs", offset.Seconds())
 
 	req := p.metricsClient.Projects.TimeSeries.List("projects/" + p.project).
-		Filter(query.filter).
+		Filter(string(query)).
 		IntervalStartTime(startTimeString).
 		IntervalEndTime(endTimeString).
 		AggregationAlignmentPeriod(offsetString).
@@ -239,7 +237,8 @@ func alignerAndReducer(alignReduceType metrics.AlignReduce) (aligner string, red
 
 // newQuery initializes a query.
 func newQuery(project, region, serviceName string) query {
-	return query{}.addFilter("resource.labels.project_id", project).
+	var q query
+	return q.addFilter("resource.labels.project_id", project).
 		addFilter("resource.labels.location", region).
 		addFilter("resource.labels.service_name", serviceName)
 }
@@ -249,10 +248,10 @@ func newQuery(project, region, serviceName string) query {
 // TODO: Support field-based filters, so the query string is generated based on
 // the fields instead of appending a filter everytime this method is called.
 func (q query) addFilter(key, value string) query {
-	if q.filter != "" {
-		q.filter += " AND "
+	if q != "" {
+		q += " AND "
 	}
-	q.filter += fmt.Sprintf("%s=%q", key, value)
+	q += query(fmt.Sprintf("%s=%q", key, value))
 
 	return q
 }
