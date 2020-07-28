@@ -54,6 +54,7 @@ func New(metricsProvider metrics.Provider, svcRecord *ServiceRecord, strategy *c
 		project:         svcRecord.Project,
 		region:          svcRecord.Region,
 		strategy:        strategy,
+		ctx:             context.TODO(),
 		log:             logrus.NewEntry(logrus.New()),
 	}
 }
