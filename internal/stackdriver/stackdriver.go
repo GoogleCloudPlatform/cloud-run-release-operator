@@ -47,14 +47,13 @@ func NewProvider(ctx context.Context, project string, region string, serviceName
 	}, nil
 }
 
-// SetCandidateRevision sets the candidate revision name for which the provide
-// should get metrics for.
+// SetCandidateRevision sets the candidate revision name for which the provider
+// should get metrics.
 func (p *Provider) SetCandidateRevision(revisionName string) {
 	p.query = p.query.addFilter("resource.labels.revision_name", revisionName)
 }
 
-// RequestCount count returns the number of requests for the given offset and
-// query.
+// RequestCount count returns the number of requests for the given offset.
 func (p *Provider) RequestCount(ctx context.Context, offset time.Duration) (int64, error) {
 	query := p.addFilter("metric.type", requestCount)
 	endTime := time.Now()
@@ -96,7 +95,7 @@ func (p *Provider) RequestCount(ctx context.Context, offset time.Duration) (int6
 	return *(series.Points[0].Value.Int64Value), nil
 }
 
-// Latency returns the latency for the resource matching the filter.
+// Latency returns the latency for the resource for the given offset.
 func (p *Provider) Latency(ctx context.Context, offset time.Duration, alignReduceType metrics.AlignReduce) (float64, error) {
 	query := p.query.addFilter("metric.type", requestLatencies)
 	endTime := time.Now()
@@ -141,7 +140,7 @@ func (p *Provider) Latency(ctx context.Context, offset time.Duration, alignReduc
 	return *(series.Points[0].Value.DoubleValue), nil
 }
 
-// ErrorRate returns the rate of 5xx errors for the resource matching the filter.
+// ErrorRate returns the rate of 5xx errors for the resource in the given offset.
 func (p *Provider) ErrorRate(ctx context.Context, offset time.Duration) (float64, error) {
 	query := p.query.addFilter("metric.type", requestCount)
 	endTime := time.Now()
