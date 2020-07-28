@@ -12,7 +12,6 @@ package sheets
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 	"time"
 
@@ -168,7 +167,7 @@ func (p *Provider) retrieveValues(logger *logrus.Entry) ([][]interface{}, error)
 	}
 	resp, err := p.client.Spreadsheets.Values.Get(p.sheetsID, readRange).Do()
 	if err != nil {
-		return nil, fmt.Errorf("unable to retrieve data from sheet: %v", err)
+		return nil, errors.Errorf("unable to retrieve data from sheet: %v", err)
 	}
 	logger.Debugf("queried %d rows", len(resp.Values))
 
