@@ -73,20 +73,18 @@ func (p *Provider) SetCandidateRevision(revisionName string) {}
 func (p *Provider) RequestCount(ctx context.Context, offset time.Duration) (int64, error) {
 	logger := util.LoggerFromContext(ctx)
 	logger.Debug("querying google sheet for request count")
-	values, err := p.retrieveValues(logger)
+	serviceRow, err := p.retrieveServiceRow(logger)
 	if err != nil {
-		return 0, errors.Wrap(err, "failed to retrieve values")
+		return 0, errors.Wrap(err, "failed to retrieve metrics for the service")
 	}
 
-	serviceRow := p.filterServiceRow(values)
-	if serviceRow == nil {
-		return 0, errors.New("no service matched the query")
+	col, ok := serviceRow[colRequestCount].(string)
+	if !ok {
+		return 0, errors.New("invalid request count value, cell must be a string")
 	}
-
-	col := serviceRow[colRequestCount].(string)
 	value, err := strconv.ParseInt(col, 10, 64)
 	if err != nil {
-		return 0, errors.New("failed to parse error rate value")
+		return 0, errors.Wrap(err, "failed to parse request count value")
 	}
 	return value, nil
 }
@@ -95,32 +93,31 @@ func (p *Provider) RequestCount(ctx context.Context, offset time.Duration) (int6
 func (p *Provider) Latency(ctx context.Context, offset time.Duration, alignReduceType metrics.AlignReduce) (float64, error) {
 	logger := util.LoggerFromContext(ctx)
 	logger.Debug("querying google sheet for request count")
-	values, err := p.retrieveValues(logger)
+	serviceRow, err := p.retrieveServiceRow(logger)
 	if err != nil {
-		return 0, errors.Wrap(err, "failed to retrieve values")
-	}
-
-	serviceRow := p.filterServiceRow(values)
-	if serviceRow == nil {
-		return 0, errors.New("no service matched the query")
+		return 0, errors.Wrap(err, "failed to retrieve metrics for the service")
 	}
 
 	var col string
+	var ok bool
 	switch alignReduceType {
 	case metrics.Align99Reduce99:
-		col = serviceRow[colLatencyP99].(string)
+		col, ok = serviceRow[colLatencyP99].(string)
 		break
 	case metrics.Align95Reduce95:
-		col = serviceRow[colLatencyP95].(string)
+		col, ok = serviceRow[colLatencyP95].(string)
 		break
 	case metrics.Align50Reduce50:
-		col = serviceRow[colLatencyP50].(string)
+		col, ok = serviceRow[colLatencyP50].(string)
 		break
 	}
 
+	if !ok {
+		return 0, errors.New("invalid latency value, cell must be a string")
+	}
 	value, err := strconv.ParseFloat(col, 64)
 	if err != nil {
-		return 0, errors.New("failed to parse latency value")
+		return 0, errors.Wrap(err, "failed to parse latency value")
 	}
 	return value, nil
 }
@@ -129,22 +126,38 @@ func (p *Provider) Latency(ctx context.Context, offset time.Duration, alignReduc
 func (p *Provider) ErrorRate(ctx context.Context, offset time.Duration) (float64, error) {
 	logger := util.LoggerFromContext(ctx)
 	logger.Debug("querying google sheet for request count")
-	values, err := p.retrieveValues(logger)
+	serviceRow, err := p.retrieveServiceRow(logger)
 	if err != nil {
-		return 0, errors.Wrap(err, "failed to retrieve values")
+		return 0, errors.Wrap(err, "failed to retrieve metrics for the service")
 	}
 
-	serviceRow := p.filterServiceRow(values)
-	if serviceRow == nil {
-		return 0, errors.New("no service matched the query")
+	col, ok := serviceRow[colErrorRate].(string)
+	if !ok {
+		return 0, errors.New("invalid error rate value, cell must be a string")
 	}
-
-	col := serviceRow[colErrorRate].(string)
 	value, err := strconv.ParseFloat(col, 64)
 	if err != nil {
-		return 0, errors.New("failed to parse error rate value")
+		return 0, errors.Wrap(err, "failed to parse error rate value")
 	}
 	return value, nil
+}
+
+// retrieveServiceRow returns the row that contains the information about the
+// service
+func (p *Provider) retrieveServiceRow(logger *logrus.Entry) ([]interface{}, error) {
+	values, err := p.retrieveValues(logger)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to retrieve values")
+	}
+
+	serviceRow, err := p.filterServiceRow(values)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to filter service row")
+	}
+	if serviceRow == nil {
+		return nil, errors.New("no service matched the query")
+	}
+	return serviceRow, nil
 }
 
 // retrieveValues get all the metrics values starting at row 2.
@@ -164,13 +177,19 @@ func (p *Provider) retrieveValues(logger *logrus.Entry) ([][]interface{}, error)
 
 // filterServiceRow returns the first row that matches the region and service
 // name.
-func (p *Provider) filterServiceRow(values [][]interface{}) []interface{} {
+func (p *Provider) filterServiceRow(values [][]interface{}) ([]interface{}, error) {
 	for _, row := range values {
-		region := row[colRegion].(string)
-		serviceName := row[colServiceName].(string)
+		region, ok := row[colRegion].(string)
+		if !ok {
+			return nil, errors.New("invalid region value, cell must be a string ")
+		}
+		serviceName, ok := row[colServiceName].(string)
+		if !ok {
+			return nil, errors.New("invalid service name value, cell must be a string ")
+		}
 		if region == p.region && serviceName == p.serviceName {
-			return row
+			return row, nil
 		}
 	}
-	return nil
+	return nil, nil
 }
