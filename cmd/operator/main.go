@@ -23,7 +23,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/metrics"
 	runapi "github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/run"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/stackdriver"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/config"
@@ -133,17 +132,12 @@ func main() {
 	}
 
 	ctx := context.Background()
-	metricsProvider, err := stackdriver.NewProvider(ctx, flProject)
-	if err != nil {
-		logger.Fatalf("failed to initialize metrics provider: %v", err)
-	}
-
 	if flCLI {
-		runCLI(ctx, logger, metricsProvider, cfg)
+		runCLI(ctx, logger, cfg)
 	}
 }
 
-func runCLI(ctx context.Context, logger *logrus.Logger, metricsProvider metrics.Provider, cfg *config.Config) {
+func runCLI(ctx context.Context, logger *logrus.Logger, cfg *config.Config) {
 	for {
 		services, err := getTargetedServices(ctx, logger, cfg.Targets)
 		if err != nil {
@@ -154,22 +148,40 @@ func runCLI(ctx context.Context, logger *logrus.Logger, metricsProvider metrics.
 		}
 
 		// TODO: Handle all the filtered services
-		client, err := runapi.NewAPIClient(ctx, services[0].Region)
-		if err != nil {
-			logger.Fatal("failed to initialize Cloud Run API client")
-		}
-		roll := rollout.New(client, metricsProvider, services[0], cfg.Strategy).WithLogger(logger)
-
-		changed, err := roll.Rollout()
-		if err != nil {
-			logger.Fatalf("rollout failed: %v", err)
-		}
-		if changed {
-			logger.Info("rollout process succeeded")
-		}
+		handleRollout(ctx, logger, services[0], cfg.Strategy)
 
 		duration := time.Duration(cfg.Strategy.Interval)
 		time.Sleep(duration * time.Second)
+	}
+}
+
+// handleRollout manages the rollout process for a single service.
+func handleRollout(ctx context.Context, logger *logrus.Logger, service *rollout.ServiceRecord, strategy *config.Strategy) {
+	lg := logger.WithFields(logrus.Fields{
+		"project": service.Project,
+		"service": service.Metadata.Name,
+		"region":  service.Region,
+	})
+
+	client, err := runapi.NewAPIClient(ctx, service.Region)
+	if err != nil {
+		lg.Error("failed to initialize Cloud Run API client")
+	}
+	metricsProvider, err := stackdriver.NewProvider(ctx, flProject)
+	if err != nil {
+		logger.Fatalf("failed to initialize metrics provider: %v", err)
+	}
+	roll := rollout.New(client, metricsProvider, service, strategy).WithLogger(lg.Logger)
+
+	changed, err := roll.Rollout()
+	if err != nil {
+		lg.Errorf("rollout failed: %v", err)
+	}
+
+	if changed {
+		lg.Debug("service was successfully updated")
+	} else {
+		lg.Debug("service kept unchanged")
 	}
 }
 
