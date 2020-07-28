@@ -181,7 +181,7 @@ func TestUpdateService(t *testing.T) {
 		svc := generateService(opts)
 		svcRecord := &rollout.ServiceRecord{Service: svc}
 
-		r := rollout.New(runclient, metricsMock, svcRecord, strategy)
+		r := rollout.New(metricsMock, svcRecord, strategy).WithClient(runclient)
 
 		t.Run(test.name, func(t *testing.T) {
 			svc, err := r.UpdateService(svc)
@@ -319,7 +319,7 @@ func TestSplitTraffic(t *testing.T) {
 		svc := generateService(opts)
 		svcRecord := &rollout.ServiceRecord{Service: svc}
 
-		r := rollout.New(runclient, metricsMock, svcRecord, strategy)
+		r := rollout.New(metricsMock, svcRecord, strategy).WithClient(runclient)
 
 		t.Run(test.name, func(t *testing.T) {
 			svc = r.SplitTraffic(svc, test.stable, test.candidate)
