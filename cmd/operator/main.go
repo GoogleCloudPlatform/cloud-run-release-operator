@@ -17,7 +17,6 @@ package main
 import (
 	"context"
 	"flag"
-	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -133,30 +132,35 @@ func main() {
 
 	ctx := context.Background()
 	if flCLI {
-		runCLI(ctx, logger, cfg)
+		err := runDaemon(ctx, logger, cfg)
+		if err != nil {
+			logger.Fatalf("error when running daemon: %v", err)
+		}
 	}
 }
 
-func runCLI(ctx context.Context, logger *logrus.Logger, cfg *config.Config) {
+func runDaemon(ctx context.Context, logger *logrus.Logger, cfg *config.Config) error {
 	for {
 		services, err := getTargetedServices(ctx, logger, cfg.Targets)
 		if err != nil {
-			log.Fatalf("failed to get targeted services %v", err)
+			return errors.Wrap(err, "failed to get targeted services")
 		}
 		if len(services) == 0 {
 			logger.Warn("no service matches the targets")
 		}
 
 		// TODO: Handle all the filtered services
-		handleRollout(ctx, logger, services[0], cfg.Strategy)
-
+		err = handleRollout(ctx, logger, services[0], cfg.Strategy)
+		if err != nil {
+			return errors.Wrap(err, "error when handling rollout")
+		}
 		duration := time.Duration(cfg.Strategy.Interval)
 		time.Sleep(duration * time.Second)
 	}
 }
 
 // handleRollout manages the rollout process for a single service.
-func handleRollout(ctx context.Context, logger *logrus.Logger, service *rollout.ServiceRecord, strategy *config.Strategy) {
+func handleRollout(ctx context.Context, logger *logrus.Logger, service *rollout.ServiceRecord, strategy *config.Strategy) error {
 	lg := logger.WithFields(logrus.Fields{
 		"project": service.Project,
 		"service": service.Metadata.Name,
@@ -165,24 +169,25 @@ func handleRollout(ctx context.Context, logger *logrus.Logger, service *rollout.
 
 	client, err := runapi.NewAPIClient(ctx, service.Region)
 	if err != nil {
-		lg.Error("failed to initialize Cloud Run API client")
+		return errors.Wrap(err, "failed to initialize Cloud Run API client")
 	}
 	metricsProvider, err := stackdriver.NewProvider(ctx, flProject)
 	if err != nil {
-		logger.Fatalf("failed to initialize metrics provider: %v", err)
+		return errors.Wrap(err, "failed to initialize metrics provider")
 	}
 	roll := rollout.New(client, metricsProvider, service, strategy).WithLogger(lg.Logger)
 
 	changed, err := roll.Rollout()
 	if err != nil {
-		lg.Errorf("rollout failed: %v", err)
+		return errors.Wrap(err, "rollout failed")
 	}
 
 	if changed {
-		lg.Debug("service was successfully updated")
+		lg.Info("service was successfully updated")
 	} else {
 		lg.Debug("service kept unchanged")
 	}
+	return nil
 }
 
 func flagsAreValid() (bool, error) {
