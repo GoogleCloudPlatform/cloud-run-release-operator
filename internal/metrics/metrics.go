@@ -23,6 +23,8 @@ const (
 type Provider interface {
 	// Sets the candidate revision name for which the provider should get
 	// metrics.
+	// TODO: Consider removing this method and making revisionName part of other
+	// method signatures.
 	SetCandidateRevision(revisionName string)
 
 	// Returns the number of requests for the given offset and query.
