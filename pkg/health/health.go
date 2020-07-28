@@ -92,17 +92,17 @@ func CollectMetrics(ctx context.Context, provider metrics.Provider, offset time.
 	if len(healthCriteria) == 0 {
 		return nil, errors.New("health criteria must be specified")
 	}
-	var results []float64
+	var metricsValues []float64
 	for _, criteria := range healthCriteria {
-		var value float64
+		var metricsValue float64
 		var err error
 
 		switch criteria.Type {
 		case config.LatencyMetricsCheck:
-			value, err = latency(ctx, provider, offset, criteria.Percentile)
+			metricsValue, err = latency(ctx, provider, offset, criteria.Percentile)
 			break
 		case config.ErrorRateMetricsCheck:
-			value, err = errorRatePercent(ctx, provider, offset)
+			metricsValue, err = errorRatePercent(ctx, provider, offset)
 			break
 		default:
 			return nil, errors.Errorf("unimplemented metrics %q", criteria.Type)
@@ -111,10 +111,10 @@ func CollectMetrics(ctx context.Context, provider metrics.Provider, offset time.
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to obtain metrics %q", criteria.Type)
 		}
-		results = append(results, value)
+		metricsValues = append(metricsValues, metricsValue)
 	}
 
-	return results, nil
+	return metricsValues, nil
 }
 
 // isCriteriaMet concludes if metrics criteria was met.
