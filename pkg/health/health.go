@@ -11,16 +11,29 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Diagnosis is a possible result after a diagnosis.
-type Diagnosis int
+// DiagnosisResult is a possible result after a diagnosis.
+type DiagnosisResult int
 
 // Possible diagnosis results.
 const (
-	Unknown Diagnosis = iota
+	Unknown DiagnosisResult = iota
 	Inconclusive
 	Healthy
 	Unhealthy
 )
+
+// Diagnosis is the information about the health of the revision.
+type Diagnosis struct {
+	OverallResult DiagnosisResult
+	CheckResults  []CheckResult
+}
+
+// CheckResult is information about a metrics criteria check.
+type CheckResult struct {
+	Threshold     float64
+	ActualValue   float64
+	IsCriteriaMet bool
+}
 
 // Diagnose attempts to determine the health of a revision.
 //
@@ -36,13 +49,14 @@ const (
 func Diagnose(ctx context.Context, healthCriteria []config.Metric, actualValues []float64) (Diagnosis, error) {
 	logger := util.LoggerFromContext(ctx)
 	if len(healthCriteria) != len(actualValues) {
-		return Unknown, errors.New("the size of health criteria is not the same to the size of the actual metrics values")
+		return Diagnosis{Unknown, nil}, errors.New("the size of health criteria is not the same to the size of the actual metrics values")
 	}
 	if len(healthCriteria) == 0 {
-		return Unknown, errors.New("health criteria must be specified")
+		return Diagnosis{Unknown, nil}, errors.New("health criteria must be specified")
 	}
 
-	diagnosis := Healthy
+	diagnosis := Unknown
+	var results []CheckResult
 	for i, value := range actualValues {
 		criteria := healthCriteria[i]
 		logger := logger.WithFields(logrus.Fields{
@@ -52,15 +66,24 @@ func Diagnose(ctx context.Context, healthCriteria []config.Metric, actualValues 
 			"actualValue": value,
 		})
 
+		result := CheckResult{Threshold: criteria.Threshold, ActualValue: value}
 		if !isCriteriaMet(criteria.Type, criteria.Threshold, value) {
 			logger.Debug("unmet criterion")
 			diagnosis = Unhealthy
+			results = append(results, result)
 			continue
 		}
+
+		// Only switch to healthy once a first criteria is met.
+		if diagnosis == Unknown {
+			diagnosis = Healthy
+		}
+		result.IsCriteriaMet = true
+		results = append(results, result)
 		logger.Debug("met criterion")
 	}
 
-	return diagnosis, nil
+	return Diagnosis{diagnosis, results}, nil
 }
 
 // CollectMetrics gets a metrics value for each of the given health criteria and

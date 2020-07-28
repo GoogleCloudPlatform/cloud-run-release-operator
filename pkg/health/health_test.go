@@ -26,8 +26,22 @@ func TestDiagnosis(t *testing.T) {
 				{Type: config.LatencyMetricsCheck, Percentile: 99, Threshold: 750},
 				{Type: config.ErrorRateMetricsCheck, Threshold: 5},
 			},
-			results:  []float64{500.0, 1.0},
-			expected: health.Healthy,
+			results: []float64{500.0, 1.0},
+			expected: health.Diagnosis{
+				OverallResult: health.Healthy,
+				CheckResults: []health.CheckResult{
+					{
+						Threshold:     750.0,
+						ActualValue:   500.0,
+						IsCriteriaMet: true,
+					},
+					{
+						Threshold:     5.0,
+						ActualValue:   1.0,
+						IsCriteriaMet: true,
+					},
+				},
+			},
 		},
 		{
 			name: "barely healthy revision",
@@ -35,24 +49,56 @@ func TestDiagnosis(t *testing.T) {
 				{Type: config.LatencyMetricsCheck, Percentile: 99, Threshold: 500},
 				{Type: config.ErrorRateMetricsCheck, Threshold: 1},
 			},
-			results:  []float64{500.0, 1.0},
-			expected: health.Healthy,
+			results: []float64{500.0, 1.0},
+			expected: health.Diagnosis{
+				OverallResult: health.Healthy,
+				CheckResults: []health.CheckResult{
+					{
+						Threshold:     500.0,
+						ActualValue:   500.0,
+						IsCriteriaMet: true,
+					},
+					{
+						Threshold:     1.0,
+						ActualValue:   1.0,
+						IsCriteriaMet: true,
+					},
+				},
+			},
 		},
 		{
 			name: "unhealthy revision, miss latency",
 			healthCriteria: []config.Metric{
 				{Type: config.LatencyMetricsCheck, Percentile: 99, Threshold: 499},
 			},
-			results:  []float64{500.0},
-			expected: health.Unhealthy,
+			results: []float64{500.0},
+			expected: health.Diagnosis{
+				OverallResult: health.Unhealthy,
+				CheckResults: []health.CheckResult{
+					{
+						Threshold:     499.0,
+						ActualValue:   500.0,
+						IsCriteriaMet: false,
+					},
+				},
+			},
 		},
 		{
 			name: "unhealthy revision, miss error rate",
 			healthCriteria: []config.Metric{
 				{Type: config.ErrorRateMetricsCheck, Threshold: 0.95},
 			},
-			results:  []float64{1.0},
-			expected: health.Unhealthy,
+			results: []float64{1.0},
+			expected: health.Diagnosis{
+				OverallResult: health.Unhealthy,
+				CheckResults: []health.CheckResult{
+					{
+						Threshold:     0.95,
+						ActualValue:   1.0,
+						IsCriteriaMet: false,
+					},
+				},
+			},
 		},
 		{
 			name: "should err, different sizes for criteria and results",
