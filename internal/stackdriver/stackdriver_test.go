@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestAddFilter(t *testing.T) {
+func TestQuery_addFilter(t *testing.T) {
 	tests := []struct {
 		name     string
 		keys     []string
@@ -17,13 +17,13 @@ func TestAddFilter(t *testing.T) {
 			name:     "single filter",
 			keys:     []string{"key1"},
 			values:   []string{"value1"},
-			expected: "key1=\"value1\"",
+			expected: `key1="value1"`,
 		},
 		{
 			name:     "multiple filters",
 			keys:     []string{"key1", "key2", "key3"},
 			values:   []string{"value1", "value2", "value3"},
-			expected: "key1=\"value1\" AND key2=\"value2\" AND key3=\"value3\"",
+			expected: `key1="value1" AND key2="value2" AND key3="value3"`,
 		},
 	}
 

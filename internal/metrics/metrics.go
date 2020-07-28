@@ -13,7 +13,8 @@ type AlignReduce int32
 
 // Series aligner and cross series reducer types (for latency).
 const (
-	Align99Reduce99 AlignReduce = iota + 1
+	Unknown AlignReduce = iota
+	Align99Reduce99
 	Align95Reduce95
 	Align50Reduce50
 )
