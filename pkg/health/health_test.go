@@ -99,6 +99,11 @@ func TestDiagnosis(t *testing.T) {
 					},
 				},
 			},
+			shouldErr: true,
+		},
+		{
+			name:      "should err, empty health criteria",
+			shouldErr: true,
 		},
 		{
 			name: "should err, different sizes for criteria and results",
