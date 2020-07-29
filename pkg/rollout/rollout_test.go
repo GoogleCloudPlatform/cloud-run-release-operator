@@ -390,3 +390,29 @@ func TestRollForward(t *testing.T) {
 		})
 	}
 }
+
+func TestRollback(t *testing.T) {
+	metricsMock := &metricsMocker.Metrics{}
+
+	stable := "test-001"
+	candidate := "test-003"
+	traffic := []*run.TrafficTarget{
+		{RevisionName: "test-001", Percent: 40, Tag: rollout.StableTag},
+		{RevisionName: "test-002", Tag: "tag1"},
+		{RevisionName: "test-003", Percent: 60, Tag: rollout.CandidateTag},
+		{RevisionName: "test-003", Tag: "tag2"},
+	}
+	expectedTraffic := []*run.TrafficTarget{
+		{RevisionName: "test-001", Percent: 100, Tag: rollout.StableTag},
+		{RevisionName: "test-003", Percent: 0, Tag: rollout.CandidateTag},
+		{LatestRevision: true, Tag: rollout.LatestTag},
+		{RevisionName: "test-002", Tag: "tag1"},
+		{RevisionName: "test-003", Tag: "tag2"},
+	}
+	svc := generateService(&ServiceOpts{Traffic: traffic})
+	svcRecord := &rollout.ServiceRecord{Service: svc}
+
+	r := rollout.New(context.TODO(), metricsMock, svcRecord, &config.Strategy{})
+	svc = r.Rollback(svc, stable, candidate)
+	assert.Equal(t, expectedTraffic, svc.Spec.Traffic)
+}
