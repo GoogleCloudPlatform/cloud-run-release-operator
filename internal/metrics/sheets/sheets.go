@@ -77,13 +77,14 @@ func (p *Provider) RequestCount(ctx context.Context, offset time.Duration) (int6
 		return 0, errors.Wrap(err, "failed to retrieve metrics for the service")
 	}
 
-	col, ok := serviceRow[colRequestCount].(string)
+	col := serviceRow[colRequestCount]
+	requestCount, ok := col.(string)
 	if !ok {
-		return 0, errors.New("invalid request count value, cell must be a string")
+		return 0, errors.Errorf("invalid request count value, must be a string but has value %v of type %T", col, col)
 	}
-	value, err := strconv.ParseInt(col, 10, 64)
+	value, err := strconv.ParseInt(requestCount, 10, 64)
 	if err != nil {
-		return 0, errors.Wrap(err, "failed to parse request count value")
+		return 0, errors.Wrap(err, "failed to parse request count")
 	}
 	return value, nil
 }
@@ -97,26 +98,26 @@ func (p *Provider) Latency(ctx context.Context, offset time.Duration, alignReduc
 		return 0, errors.Wrap(err, "failed to retrieve metrics for the service")
 	}
 
-	var col string
-	var ok bool
+	var col interface{}
 	switch alignReduceType {
 	case metrics.Align99Reduce99:
-		col, ok = serviceRow[colLatencyP99].(string)
+		col = serviceRow[colLatencyP99]
 		break
 	case metrics.Align95Reduce95:
-		col, ok = serviceRow[colLatencyP95].(string)
+		col = serviceRow[colLatencyP95]
 		break
 	case metrics.Align50Reduce50:
-		col, ok = serviceRow[colLatencyP50].(string)
+		col = serviceRow[colLatencyP50]
 		break
 	}
 
+	latency, ok := col.(string)
 	if !ok {
-		return 0, errors.New("invalid latency value, cell must be a string")
+		return 0, errors.Errorf("invalid latency value, must be a string but has value %v of type %T", col, col)
 	}
-	value, err := strconv.ParseFloat(col, 64)
+	value, err := strconv.ParseFloat(latency, 64)
 	if err != nil {
-		return 0, errors.Wrap(err, "failed to parse latency value")
+		return 0, errors.Wrap(err, "failed to parse latency")
 	}
 	return value, nil
 }
@@ -130,13 +131,14 @@ func (p *Provider) ErrorRate(ctx context.Context, offset time.Duration) (float64
 		return 0, errors.Wrap(err, "failed to retrieve metrics for the service")
 	}
 
-	col, ok := serviceRow[colErrorRate].(string)
+	col := serviceRow[colErrorRate]
+	errorRate, ok := col.(string)
 	if !ok {
-		return 0, errors.New("invalid error rate value, cell must be a string")
+		return 0, errors.Errorf("invalid error rate value, must be a string but has value %v of type %T", col, col)
 	}
-	value, err := strconv.ParseFloat(col, 64)
+	value, err := strconv.ParseFloat(errorRate, 64)
 	if err != nil {
-		return 0, errors.Wrap(err, "failed to parse error rate value")
+		return 0, errors.Wrap(err, "failed to parse error rate")
 	}
 	return value, nil
 }
@@ -154,7 +156,7 @@ func (p *Provider) retrieveServiceRow(logger *logrus.Entry) ([]interface{}, erro
 		return nil, errors.Wrap(err, "failed to filter service row")
 	}
 	if serviceRow == nil {
-		return nil, errors.New("no service matched the query")
+		return nil, errors.Errorf("no service matched the query, region=%q service=%q", p.region, p.serviceName)
 	}
 	return serviceRow, nil
 }
@@ -167,7 +169,7 @@ func (p *Provider) retrieveValues(logger *logrus.Entry) ([][]interface{}, error)
 	}
 	resp, err := p.client.Spreadsheets.Values.Get(p.sheetsID, readRange).Do()
 	if err != nil {
-		return nil, errors.Errorf("unable to retrieve data from sheet: %v", err)
+		return nil, errors.Wrap(err, "unable to retrieve data from sheet")
 	}
 	logger.Debugf("queried %d rows", len(resp.Values))
 
@@ -178,13 +180,15 @@ func (p *Provider) retrieveValues(logger *logrus.Entry) ([][]interface{}, error)
 // name.
 func (p *Provider) filterServiceRow(values [][]interface{}) ([]interface{}, error) {
 	for _, row := range values {
-		region, ok := row[colRegion].(string)
+		col := row[colRegion]
+		region, ok := col.(string)
 		if !ok {
-			return nil, errors.New("invalid region value, cell must be a string ")
+			return nil, errors.Errorf("invalid region value, must be a string but has value %v of type %T", col, col)
 		}
-		serviceName, ok := row[colServiceName].(string)
+		col = row[colServiceName]
+		serviceName, ok := col.(string)
 		if !ok {
-			return nil, errors.New("invalid service name value, cell must be a string ")
+			return nil, errors.Errorf("invalid service name value, must be a string but has value %v of type %T", col, col)
 		}
 		if region == p.region && serviceName == p.serviceName {
 			return row, nil
