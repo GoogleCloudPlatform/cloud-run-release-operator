@@ -7,6 +7,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/metrics"
 	runapi "github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/run"
+	"github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/util"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/config"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/health"
 	"github.com/pkg/errors"
@@ -112,7 +113,7 @@ func (r *Rollout) UpdateService(svc *run.Service) (*run.Service, error) {
 	r.log.Debugf("%q is the candidate revision", stable)
 	r.log = r.log.WithField("candidate", candidate)
 
-	// A new candidate does not have metrics yet, so it can't not be diagnosed.
+	// A new candidate does not have metrics yet, so it can't be diagnosed.
 	if isNewCandidate(svc, candidate) {
 		r.log.Debug("new candidate found")
 		svc = r.RollForward(svc, stable, candidate)
@@ -313,13 +314,14 @@ func (r *Rollout) diagnoseCandidate(candidate string, healthCriteria []config.Me
 	// TODO(gvso): Consider using a different config value for the offset.
 	healthCheckOffset := time.Duration(r.strategy.Interval) * time.Second
 	r.log.Debug("collecting metrics from API")
-	metricsValues, err := health.CollectMetrics(r.ctx, r.metricsProvider, healthCheckOffset, healthCriteria)
+	ctx := util.ContextWithLogger(r.ctx, r.log)
+	metricsValues, err := health.CollectMetrics(ctx, r.metricsProvider, healthCheckOffset, healthCriteria)
 	if err != nil {
 		return d, errors.Wrap(err, "failed to collect metrics")
 	}
 
 	r.log.Debug("diagnosing the candidate's health based on the metrics")
-	d, err = health.Diagnose(r.ctx, healthCriteria, metricsValues)
+	d, err = health.Diagnose(ctx, healthCriteria, metricsValues)
 	if err != nil {
 		return d, errors.Wrap(err, "failed to diagnose candidate's health")
 	}

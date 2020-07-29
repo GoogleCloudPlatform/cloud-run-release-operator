@@ -1,8 +1,6 @@
 package rollout
 
 import (
-	"log"
-
 	"google.golang.org/api/run/v1"
 )
 
@@ -87,7 +85,6 @@ func findRevisionWithTag(svc *run.Service, tag string) string {
 // about it (it has 0 traffic), so the rollout process should add some initial
 // to the new revision.
 func isNewCandidate(svc *run.Service, currentCandidate string) bool {
-	log.Println(currentCandidate)
 	lastFailedCandidate := svc.Metadata.Annotations[LastFailedCandidateRevisionAnnotation]
 	for _, target := range svc.Spec.Traffic {
 		if target.RevisionName == currentCandidate {
