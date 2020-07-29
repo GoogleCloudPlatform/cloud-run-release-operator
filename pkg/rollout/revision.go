@@ -6,8 +6,9 @@ import (
 
 // Annotations name for information related to the rollout.
 const (
-	StableRevisionAnnotation    = "rollout.cloud.run/stableRevision"
-	CandidateRevisionAnnotation = "rollout.cloud.run/candidateRevision"
+	StableRevisionAnnotation              = "rollout.cloud.run/stableRevision"
+	CandidateRevisionAnnotation           = "rollout.cloud.run/candidateRevision"
+	LastFailedCandidateRevisionAnnotation = "rollout.cloud.run/lastFailedCandidateRevision"
 )
 
 // DetectStableRevisionName returns the stable revision of the Cloud Run service.
@@ -40,13 +41,30 @@ func DetectStableRevisionName(svc *run.Service) string {
 
 // DetectCandidateRevisionName attempts to deduce what revision could be
 // considered a candidate.
-func DetectCandidateRevisionName(svc *run.Service, stable string) string {
+//
+// It also determines if the candidate is different from a previous rollout
+// process. Knowing if a candidate is a new one is useful since metrics cannot
+// be obtained on it (it has 0 traffic), so the rollout process should add some
+// initial traffic to the new revision.
+func DetectCandidateRevisionName(svc *run.Service, stable string) (string, bool) {
 	latestRevision := svc.Status.LatestReadyRevisionName
 	if stable == latestRevision {
-		return ""
+		return "", false
 	}
 
-	return latestRevision
+	// If the latestRevision has previously been treated as a candidate and
+	// failed to meet health checks, no candidate exists.
+	if latestRevision == svc.Metadata.Annotations[LastFailedCandidateRevisionAnnotation] {
+		return "", false
+	}
+
+	isNewCandidate := false
+	previousCandidate := findRevisionWithTag(svc, CandidateTag)
+	if previousCandidate != latestRevision {
+		isNewCandidate = true
+	}
+
+	return latestRevision, isNewCandidate
 }
 
 // find100PercentServingRevisionName scans the service and retrieves a revision

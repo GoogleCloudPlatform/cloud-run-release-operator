@@ -3,10 +3,12 @@ package rollout
 import (
 	"context"
 	"io/ioutil"
+	"time"
 
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/metrics"
 	runapi "github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/run"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/config"
+	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/health"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/run/v1"
@@ -33,6 +35,9 @@ type Rollout struct {
 
 	// Used to determine if candidate should become stable during update.
 	promoteToStable bool
+
+	// Used to update annotations when rollback should occur.
+	requireRollback bool
 }
 
 // Automatic tags.
@@ -98,14 +103,35 @@ func (r *Rollout) UpdateService(svc *run.Service) (*run.Service, error) {
 	}
 	r.log.Debugf("%q is the stable revision", stable)
 
-	candidate := DetectCandidateRevisionName(svc, stable)
+	candidate, isNewCandidate := DetectCandidateRevisionName(svc, stable)
 	if candidate == "" {
 		r.log.Info("could not determine candidate revision")
 		return nil, nil
 	}
-	r.log.Debugf("%q is the candidate revision", candidate)
 
-	svc = r.SplitTraffic(svc, stable, candidate)
+	var diagnosis *health.Diagnosis
+	// A new candidate does not have metrics yet, so it can't not be diagnosed.
+	if !isNewCandidate {
+		var err error
+		diagnosis, err = r.diagnoseCandidate(candidate, r.strategy.Metrics)
+		if err != nil || diagnosis.OverallResult == health.Unknown {
+			r.log.Error("could not diagnose candidate's health")
+			return nil, errors.Wrap(err, "failed to diagnose candidate's health")
+		}
+	}
+
+	if isNewCandidate || diagnosis.OverallResult == health.Healthy {
+		svc = r.SplitTraffic(svc, stable, candidate)
+	} else if diagnosis.OverallResult == health.Unhealthy {
+		r.requireRollback = true
+		svc = r.Rollback(svc, stable)
+	} else {
+		r.log.Debug("no enough requests to determine health, skipping rollout/rollback for now")
+		return nil, nil
+	}
+
+	// TODO(gvso): include annotation about the diagnosis (especially when
+	// diagnosis is unhealthy).
 	svc = r.updateAnnotations(svc, stable, candidate)
 	svc, err := r.runClient.ReplaceService(r.project, r.serviceName, svc)
 	if err != nil {
@@ -158,7 +184,23 @@ func (r *Rollout) SplitTraffic(svc *run.Service, stable, candidate string) *run.
 	}
 
 	svc.Spec.Traffic = traffic
+	return svc
+}
 
+// Rollback redirects all the traffic to the stable revision.
+func (r *Rollout) Rollback(svc *run.Service, stable string) *run.Service {
+	traffic := []*run.TrafficTarget{newTrafficTarget(stable, 100, StableTag)}
+
+	// Respect tags manually introduced by the user (e.g. UI/gcloud).
+	customTags := userDefinedTrafficTags(svc)
+	traffic = append(traffic, customTags...)
+
+	// Always assign latest tag to the latest revision.
+	traffic = append(traffic, &run.TrafficTarget{LatestRevision: true, Tag: LatestTag})
+
+	r.log.Infof("candidate did not meet health criteria, will roll back to %q", stable)
+
+	svc.Spec.Traffic = traffic
 	return svc
 }
 
@@ -238,10 +280,35 @@ func (r *Rollout) updateAnnotations(svc *run.Service, stable, candidate string) 
 		return svc
 	}
 
+	if r.requireRollback {
+		delete(svc.Metadata.Annotations, CandidateRevisionAnnotation)
+		svc.Metadata.Annotations[LastFailedCandidateRevisionAnnotation] = candidate
+	} else {
+		svc.Metadata.Annotations[CandidateRevisionAnnotation] = candidate
+	}
+
 	svc.Metadata.Annotations[StableRevisionAnnotation] = stable
-	svc.Metadata.Annotations[CandidateRevisionAnnotation] = candidate
 
 	return svc
+}
+
+// diagnoseCandidate returns the candidate's diagnosis based on metrics.
+func (r *Rollout) diagnoseCandidate(candidate string, healthCriteria []config.Metric) (*health.Diagnosis, error) {
+	// TODO(gvso): Consider using a different config value for the offset.
+	healthCheckOffset := time.Duration(r.strategy.Interval) * time.Second
+	metricsValues, err := health.CollectMetrics(r.ctx, r.metricsProvider, healthCheckOffset, healthCriteria)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to collect metrics")
+	}
+	diagnosis, err := health.Diagnose(r.ctx, healthCriteria, metricsValues)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to diagnose candidate's health")
+	}
+
+	if diagnosis.OverallResult == health.Unknown {
+		return nil, errors.New("candidate's health is unknown, did you forget to provide health criteria?")
+	}
+	return &diagnosis, nil
 }
 
 // newTrafficTarget returns a new traffic target instance.
