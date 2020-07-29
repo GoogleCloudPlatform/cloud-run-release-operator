@@ -81,12 +81,10 @@ func TestDetectCandidateRevisionName(t *testing.T) {
 		latestReady    string
 		stableRevision string
 		expected       string
-		newCandidate   bool
 	}{
 		// Latest revision is the same as the stable one.
 		{
 			name:           "same latest and stable revisions",
-			annotations:    map[string]string{},
 			latestReady:    "test-001",
 			stableRevision: "test-001",
 			expected:       "",
@@ -94,11 +92,9 @@ func TestDetectCandidateRevisionName(t *testing.T) {
 		// Latest revision is not the same as the stable one.
 		{
 			name:           "different latest and stable revisions",
-			annotations:    map[string]string{},
 			latestReady:    "test-002",
 			stableRevision: "test-001",
 			expected:       "test-002",
-			newCandidate:   true,
 		},
 		// Latest revision is not the same as the stable one, but latest was unhealthy.
 		{
@@ -110,30 +106,6 @@ func TestDetectCandidateRevisionName(t *testing.T) {
 			stableRevision: "test-001",
 			expected:       "",
 		},
-		// Same candidate as previous process.
-		{
-			name:        "same candidate",
-			annotations: map[string]string{},
-			traffic: []*run.TrafficTarget{
-				{RevisionName: "test-002", Percent: 50, Tag: rollout.CandidateTag},
-			},
-			latestReady:    "test-002",
-			stableRevision: "test-001",
-			expected:       "test-002",
-			newCandidate:   false,
-		},
-		// Different candidate from previous process.
-		{
-			name:        "different candidate",
-			annotations: map[string]string{},
-			traffic: []*run.TrafficTarget{
-				{RevisionName: "test-002", Percent: 50, Tag: rollout.CandidateTag},
-			},
-			latestReady:    "test-003",
-			stableRevision: "test-001",
-			expected:       "test-003",
-			newCandidate:   true,
-		},
 	}
 
 	for _, test := range tests {
@@ -144,10 +116,9 @@ func TestDetectCandidateRevisionName(t *testing.T) {
 				LatestReadyRevision: test.latestReady,
 			}
 			svc := generateService(opts)
-			candidate, isNew := rollout.DetectCandidateRevisionName(svc, test.stableRevision)
+			candidate := rollout.DetectCandidateRevisionName(svc, test.stableRevision)
 
 			assert.Equal(t, test.expected, candidate)
-			assert.Equal(t, test.newCandidate, isNew)
 		})
 	}
 }

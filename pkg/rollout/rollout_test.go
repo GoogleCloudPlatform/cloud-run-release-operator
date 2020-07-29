@@ -11,6 +11,7 @@ import (
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/config"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/rollout"
 	"github.com/google/go-cmp/cmp"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/api/run/v1"
 )
@@ -201,11 +202,13 @@ func TestUpdateService(t *testing.T) {
 				{Type: config.ErrorRateMetricsCheck, Threshold: 0.95},
 			},
 			outAnnotations: map[string]string{
-				rollout.LastFailedCandidateRevisionAnnotation: "test-002",
 				rollout.StableRevisionAnnotation:              "test-001",
+				rollout.CandidateRevisionAnnotation:           "test-002",
+				rollout.LastFailedCandidateRevisionAnnotation: "test-002",
 			},
 			outTraffic: []*run.TrafficTarget{
 				{RevisionName: "test-001", Percent: 100, Tag: rollout.StableTag},
+				{RevisionName: "test-002", Percent: 0, Tag: rollout.CandidateTag},
 				{LatestRevision: true, Tag: rollout.LatestTag},
 			},
 		},
@@ -239,7 +242,9 @@ func TestUpdateService(t *testing.T) {
 		svcRecord := &rollout.ServiceRecord{Service: svc}
 
 		strategy.Metrics = test.healthCriteria
-		r := rollout.New(context.TODO(), metricsMock, svcRecord, strategy).WithClient(runclient)
+		lg := logrus.New()
+		lg.SetLevel(logrus.DebugLevel)
+		r := rollout.New(context.TODO(), metricsMock, svcRecord, strategy).WithClient(runclient).WithLogger(lg)
 
 		t.Run(test.name, func(t *testing.T) {
 			svc, err := r.UpdateService(svc)
@@ -256,7 +261,7 @@ func TestUpdateService(t *testing.T) {
 	}
 }
 
-func TestSplitTraffic(t *testing.T) {
+func TestRollForward(t *testing.T) {
 	runclient := &runMocker.RunAPI{}
 	metricsMock := &metricsMocker.Metrics{}
 	strategy := &config.Strategy{
@@ -285,9 +290,9 @@ func TestSplitTraffic(t *testing.T) {
 			expected: []*run.TrafficTarget{
 				{RevisionName: "test-001", Percent: 95, Tag: rollout.StableTag},
 				{RevisionName: "test-003", Percent: 5, Tag: rollout.CandidateTag},
+				{LatestRevision: true, Tag: rollout.LatestTag},
 				{RevisionName: "test-001", Tag: "tag1"},
 				{RevisionName: "test-002", Tag: "tag2"},
-				{LatestRevision: true, Tag: rollout.LatestTag},
 			},
 		},
 		// Candidate is the same. Continue rolling forward.
@@ -305,9 +310,9 @@ func TestSplitTraffic(t *testing.T) {
 			expected: []*run.TrafficTarget{
 				{RevisionName: "test-001", Percent: 40, Tag: rollout.StableTag},
 				{RevisionName: "test-003", Percent: 60, Tag: rollout.CandidateTag},
+				{LatestRevision: true, Tag: rollout.LatestTag},
 				{RevisionName: "test-002", Tag: "tag1"},
 				{RevisionName: "test-003", Tag: "tag2"},
-				{LatestRevision: true, Tag: rollout.LatestTag},
 			},
 		},
 		// Candidate is the same. Continue rolling forward to 100%.
@@ -324,9 +329,9 @@ func TestSplitTraffic(t *testing.T) {
 			expected: []*run.TrafficTarget{
 				{RevisionName: "test-001", Percent: 0, Tag: rollout.StableTag},
 				{RevisionName: "test-003", Percent: 100, Tag: rollout.CandidateTag},
+				{LatestRevision: true, Tag: rollout.LatestTag},
 				{RevisionName: "test-002", Tag: "tag1"},
 				{RevisionName: "test-003", Tag: "tag2"},
-				{LatestRevision: true, Tag: rollout.LatestTag},
 			},
 		},
 		// Candidate has proven able to handle 100%, make it stable.
@@ -343,9 +348,9 @@ func TestSplitTraffic(t *testing.T) {
 			},
 			expected: []*run.TrafficTarget{
 				{RevisionName: "test-003", Percent: 100, Tag: rollout.StableTag},
+				{LatestRevision: true, Tag: rollout.LatestTag},
 				{RevisionName: "test-002", Tag: "tag1"},
 				{RevisionName: "test-003", Tag: "tag2"},
-				{LatestRevision: true, Tag: rollout.LatestTag},
 			},
 		},
 		// Two targets for the same stable and candidate revisions.
@@ -364,8 +369,8 @@ func TestSplitTraffic(t *testing.T) {
 			expected: []*run.TrafficTarget{
 				{RevisionName: "test-001", Percent: 40, Tag: rollout.StableTag},
 				{RevisionName: "test-003", Percent: 60, Tag: rollout.CandidateTag},
-				{RevisionName: "test-002", Tag: "tag1"},
 				{LatestRevision: true, Tag: rollout.LatestTag},
+				{RevisionName: "test-002", Tag: "tag1"},
 			},
 		},
 	}
@@ -380,7 +385,7 @@ func TestSplitTraffic(t *testing.T) {
 		r := rollout.New(context.TODO(), metricsMock, svcRecord, strategy).WithClient(runclient)
 
 		t.Run(test.name, func(t *testing.T) {
-			svc = r.SplitTraffic(svc, test.stable, test.candidate)
+			svc = r.RollForward(svc, test.stable, test.candidate)
 			assert.True(t, cmp.Equal(test.expected, svc.Spec.Traffic))
 		})
 	}

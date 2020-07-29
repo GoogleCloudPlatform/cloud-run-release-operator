@@ -1,6 +1,8 @@
 package rollout
 
 import (
+	"log"
+
 	"google.golang.org/api/run/v1"
 )
 
@@ -41,30 +43,18 @@ func DetectStableRevisionName(svc *run.Service) string {
 
 // DetectCandidateRevisionName attempts to deduce what revision could be
 // considered a candidate.
-//
-// It also determines if the candidate is different from a previous rollout
-// process. Knowing if a candidate is a new one is useful since metrics cannot
-// be obtained on it (it has 0 traffic), so the rollout process should add some
-// initial traffic to the new revision.
-func DetectCandidateRevisionName(svc *run.Service, stable string) (string, bool) {
+func DetectCandidateRevisionName(svc *run.Service, stable string) string {
 	latestRevision := svc.Status.LatestReadyRevisionName
 	if stable == latestRevision {
-		return "", false
+		return ""
 	}
 
 	// If the latestRevision has previously been treated as a candidate and
 	// failed to meet health checks, no candidate exists.
 	if latestRevision == svc.Metadata.Annotations[LastFailedCandidateRevisionAnnotation] {
-		return "", false
+		return ""
 	}
-
-	isNewCandidate := false
-	previousCandidate := findRevisionWithTag(svc, CandidateTag)
-	if previousCandidate != latestRevision {
-		isNewCandidate = true
-	}
-
-	return latestRevision, isNewCandidate
+	return latestRevision
 }
 
 // find100PercentServingRevisionName scans the service and retrieves a revision
@@ -89,4 +79,24 @@ func findRevisionWithTag(svc *run.Service, tag string) string {
 	}
 
 	return ""
+}
+
+// isNewCandidate determines if the candidate was just deployed.
+//
+// Knowing that a candidate is new is helpful since metrics cannot be obtained
+// about it (it has 0 traffic), so the rollout process should add some initial
+// to the new revision.
+func isNewCandidate(svc *run.Service, currentCandidate string) bool {
+	log.Println(currentCandidate)
+	lastFailedCandidate := svc.Metadata.Annotations[LastFailedCandidateRevisionAnnotation]
+	for _, target := range svc.Spec.Traffic {
+		if target.RevisionName == currentCandidate {
+			log.Println("here")
+			return currentCandidate != lastFailedCandidate && target.Percent == 0
+		}
+	}
+
+	// The current candidate was not part of the service traffic config because
+	// it has no traffic.
+	return true
 }

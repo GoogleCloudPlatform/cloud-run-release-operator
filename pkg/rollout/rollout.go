@@ -14,6 +14,15 @@ import (
 	"google.golang.org/api/run/v1"
 )
 
+type nextAction int
+
+const (
+	unknown nextAction = iota
+	nothing
+	rollforward
+	rollback
+)
+
 // ServiceRecord holds a service object and information about it.
 type ServiceRecord struct {
 	*run.Service
@@ -37,7 +46,7 @@ type Rollout struct {
 	promoteToStable bool
 
 	// Used to update annotations when rollback should occur.
-	requireRollback bool
+	shouldRollback bool
 }
 
 // Automatic tags.
@@ -102,56 +111,64 @@ func (r *Rollout) UpdateService(svc *run.Service) (*run.Service, error) {
 		return nil, nil
 	}
 	r.log.Debugf("%q is the stable revision", stable)
+	r.log = r.log.WithField("stable", stable)
 
-	candidate, isNewCandidate := DetectCandidateRevisionName(svc, stable)
+	candidate := DetectCandidateRevisionName(svc, stable)
 	if candidate == "" {
 		r.log.Info("could not determine candidate revision")
 		return nil, nil
 	}
+	r.log.Debugf("%q is the candidate revision", stable)
+	r.log = r.log.WithField("candidate", candidate)
 
-	var diagnosis *health.Diagnosis
 	// A new candidate does not have metrics yet, so it can't not be diagnosed.
-	if !isNewCandidate {
-		var err error
-		diagnosis, err = r.diagnoseCandidate(candidate, r.strategy.Metrics)
-		if err != nil || diagnosis.OverallResult == health.Unknown {
-			r.log.Error("could not diagnose candidate's health")
-			return nil, errors.Wrap(err, "failed to diagnose candidate's health")
-		}
+	if isNewCandidate(svc, candidate) {
+		r.log.Debug("new candidate found")
+		svc = r.RollForward(svc, stable, candidate)
+		svc = r.updateAnnotations(svc, stable, candidate)
+		return r.replaceService(svc)
 	}
 
-	if isNewCandidate || diagnosis.OverallResult == health.Healthy {
-		svc = r.SplitTraffic(svc, stable, candidate)
-	} else if diagnosis.OverallResult == health.Unhealthy {
-		r.requireRollback = true
-		svc = r.Rollback(svc, stable)
-	} else {
+	diagnosis, err := r.diagnoseCandidate(candidate, r.strategy.Metrics)
+	if err != nil {
+		r.log.Error("could not diagnose candidate's health")
+		return nil, errors.Wrapf(err, "failed to diagnose health for candidate %q", candidate)
+	}
+
+	switch diagnosis.OverallResult {
+	case health.Unknown:
+		r.log.Error("unknown candidate's health")
+		return nil, errors.Errorf("got unknown health for candidate %q", candidate)
+	case health.Inconclusive:
 		r.log.Debug("no enough requests to determine health, skipping rollout/rollback for now")
 		return nil, nil
+	case health.Healthy:
+		r.log.Debug("candidate is healthy, will increase traffic to candidate")
+		svc = r.RollForward(svc, stable, candidate)
+		break
+	case health.Unhealthy:
+		r.log.Infof("candidate did not meet health criteria, will roll back to %q", stable)
+		r.shouldRollback = true
+		svc = r.Rollback(svc, stable, candidate)
+		break
+	default:
+		return nil, errors.Errorf("invalid health diagnosis %v", diagnosis.OverallResult)
 	}
 
 	// TODO(gvso): include annotation about the diagnosis (especially when
 	// diagnosis is unhealthy).
 	svc = r.updateAnnotations(svc, stable, candidate)
-	svc, err := r.runClient.ReplaceService(r.project, r.serviceName, svc)
-	if err != nil {
-		return nil, errors.Wrapf(err, "could not update service %q", r.serviceName)
-	}
-	r.log.Debug("service succesfully updated")
-
-	return svc, nil
+	return r.replaceService(svc)
 }
 
-// SplitTraffic changes the traffic configuration of the service.
+// RollForward changes the traffic configuration of the service to increase the
+// traffic to the candidate.
 //
 // It creates a new traffic configuration for the service. It creates a new
 // traffic configuration for the candidate and stable revisions.
 // The method respects user-defined revision tags.
-func (r *Rollout) SplitTraffic(svc *run.Service, stable, candidate string) *run.Service {
-	r.log.WithFields(logrus.Fields{
-		"stable":    stable,
-		"candidate": candidate,
-	}).Debug("splitting traffic", stable, candidate)
+func (r *Rollout) RollForward(svc *run.Service, stable, candidate string) *run.Service {
+	r.log.Debug("splitting traffic")
 
 	var traffic []*run.TrafficTarget
 	var stablePercent int64
@@ -168,13 +185,7 @@ func (r *Rollout) SplitTraffic(svc *run.Service, stable, candidate string) *run.
 		traffic = append(traffic, stableTraffic)
 	}
 	traffic = append(traffic, candidateTraffic)
-
-	// Respect tags manually introduced by the user (e.g. UI/gcloud).
-	customTags := userDefinedTrafficTags(svc)
-	traffic = append(traffic, customTags...)
-
-	// Always assign latest tag to the latest revision.
-	traffic = append(traffic, &run.TrafficTarget{LatestRevision: true, Tag: LatestTag})
+	traffic = append(traffic, inheritRevisionTags(svc)...)
 
 	if !r.promoteToStable {
 		r.log.Infof("will assign %d%% of the traffic to stable revision %s", stablePercent, stable)
@@ -188,20 +199,26 @@ func (r *Rollout) SplitTraffic(svc *run.Service, stable, candidate string) *run.
 }
 
 // Rollback redirects all the traffic to the stable revision.
-func (r *Rollout) Rollback(svc *run.Service, stable string) *run.Service {
-	traffic := []*run.TrafficTarget{newTrafficTarget(stable, 100, StableTag)}
-
-	// Respect tags manually introduced by the user (e.g. UI/gcloud).
-	customTags := userDefinedTrafficTags(svc)
-	traffic = append(traffic, customTags...)
-
-	// Always assign latest tag to the latest revision.
-	traffic = append(traffic, &run.TrafficTarget{LatestRevision: true, Tag: LatestTag})
-
-	r.log.Infof("candidate did not meet health criteria, will roll back to %q", stable)
+func (r *Rollout) Rollback(svc *run.Service, stable, candidate string) *run.Service {
+	traffic := []*run.TrafficTarget{
+		newTrafficTarget(stable, 100, StableTag),
+		newTrafficTarget(candidate, 0, CandidateTag),
+	}
+	traffic = append(traffic, inheritRevisionTags(svc)...)
 
 	svc.Spec.Traffic = traffic
 	return svc
+}
+
+// replaceService updates the service object in Cloud Run.
+func (r *Rollout) replaceService(svc *run.Service) (*run.Service, error) {
+	svc, err := r.runClient.ReplaceService(r.project, r.serviceName, svc)
+	if err != nil {
+		return nil, errors.Wrapf(err, "could not update service %q", r.serviceName)
+	}
+	r.log.Debug("service succesfully updated")
+
+	return svc, nil
 }
 
 // newCandidateTraffic returns the next candidate's traffic configuration.
@@ -227,6 +244,18 @@ func (r *Rollout) newCandidateTraffic(svc *run.Service, candidate string) (*run.
 	candidateTarget = newTrafficTarget(candidate, candidatePercent, CandidateTag)
 
 	return candidateTarget, promoteToStable
+}
+
+// inheritRevisionTags returns the tags that must be conserved.
+func inheritRevisionTags(svc *run.Service) []*run.TrafficTarget {
+	traffic := []*run.TrafficTarget{
+		// Always assign latest tag to the latest revision.
+		{LatestRevision: true, Tag: LatestTag},
+	}
+	// Respect tags manually introduced by the user (e.g. UI/gcloud).
+	customTags := userDefinedTrafficTags(svc)
+	traffic = append(traffic, customTags...)
+	return traffic
 }
 
 // userDefinedTrafficTags returns the traffic configurations that include tags
@@ -276,39 +305,38 @@ func (r *Rollout) updateAnnotations(svc *run.Service, stable, candidate string) 
 	if r.promoteToStable {
 		svc.Metadata.Annotations[StableRevisionAnnotation] = candidate
 		delete(svc.Metadata.Annotations, CandidateRevisionAnnotation)
-
 		return svc
 	}
 
-	if r.requireRollback {
-		delete(svc.Metadata.Annotations, CandidateRevisionAnnotation)
-		svc.Metadata.Annotations[LastFailedCandidateRevisionAnnotation] = candidate
-	} else {
-		svc.Metadata.Annotations[CandidateRevisionAnnotation] = candidate
-	}
-
 	svc.Metadata.Annotations[StableRevisionAnnotation] = stable
+	svc.Metadata.Annotations[CandidateRevisionAnnotation] = candidate
+	if r.shouldRollback {
+		svc.Metadata.Annotations[LastFailedCandidateRevisionAnnotation] = candidate
+	}
 
 	return svc
 }
 
 // diagnoseCandidate returns the candidate's diagnosis based on metrics.
-func (r *Rollout) diagnoseCandidate(candidate string, healthCriteria []config.Metric) (*health.Diagnosis, error) {
+func (r *Rollout) diagnoseCandidate(candidate string, healthCriteria []config.Metric) (d health.Diagnosis, err error) {
 	// TODO(gvso): Consider using a different config value for the offset.
 	healthCheckOffset := time.Duration(r.strategy.Interval) * time.Second
+	r.log.Debug("collecting metrics from API")
 	metricsValues, err := health.CollectMetrics(r.ctx, r.metricsProvider, healthCheckOffset, healthCriteria)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to collect metrics")
-	}
-	diagnosis, err := health.Diagnose(r.ctx, healthCriteria, metricsValues)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to diagnose candidate's health")
+		return d, errors.Wrap(err, "failed to collect metrics")
 	}
 
-	if diagnosis.OverallResult == health.Unknown {
-		return nil, errors.New("candidate's health is unknown, did you forget to provide health criteria?")
+	r.log.Debug("diagnosing the candidate's health based on the metrics")
+	d, err = health.Diagnose(r.ctx, healthCriteria, metricsValues)
+	if err != nil {
+		return d, errors.Wrap(err, "failed to diagnose candidate's health")
 	}
-	return &diagnosis, nil
+
+	if d.OverallResult == health.Unknown {
+		return d, errors.New("candidate's health is unknown, did you forget to provide health criteria?")
+	}
+	return d, nil
 }
 
 // newTrafficTarget returns a new traffic target instance.
