@@ -91,7 +91,6 @@ func isNewCandidate(svc *run.Service, currentCandidate string) bool {
 	lastFailedCandidate := svc.Metadata.Annotations[LastFailedCandidateRevisionAnnotation]
 	for _, target := range svc.Spec.Traffic {
 		if target.RevisionName == currentCandidate {
-			log.Println("here")
 			return currentCandidate != lastFailedCandidate && target.Percent == 0
 		}
 	}
