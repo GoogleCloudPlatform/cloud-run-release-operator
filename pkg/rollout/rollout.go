@@ -14,15 +14,6 @@ import (
 	"google.golang.org/api/run/v1"
 )
 
-type nextAction int
-
-const (
-	unknown nextAction = iota
-	nothing
-	rollforward
-	rollback
-)
-
 // ServiceRecord holds a service object and information about it.
 type ServiceRecord struct {
 	*run.Service
