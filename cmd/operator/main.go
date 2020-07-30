@@ -159,6 +159,7 @@ func runDaemon(ctx context.Context, logger *logrus.Logger, cfg *config.Config) e
 
 		var (
 			errs []error
+			mu   sync.Mutex
 			wg   sync.WaitGroup
 		)
 		for _, service := range services {
@@ -166,7 +167,9 @@ func runDaemon(ctx context.Context, logger *logrus.Logger, cfg *config.Config) e
 			go func(ctx context.Context, lg *logrus.Logger, svc *rollout.ServiceRecord, strategy *config.Strategy) {
 				err = handleRollout(ctx, lg, svc, strategy)
 				if err != nil {
+					mu.Lock()
 					errs = append(errs, err)
+					mu.Unlock()
 				}
 				wg.Done()
 			}(ctx, logger, service, cfg.Strategy)
