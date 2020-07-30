@@ -75,67 +75,65 @@ func NewTarget(project string, regions []string, labelSelector string) *Target {
 	}
 }
 
-// IsValid checks if the configuration is valid.
-func (config *Config) IsValid(cliMode bool) (bool, error) {
+// Validate checks if the configuration is valid.
+func (config *Config) Validate(cliMode bool) error {
 	if cliMode && config.Strategy.Interval <= 0 {
-		return false, errors.New("time interval must be greater than 0")
+		return errors.New("time interval must be greater than 0")
 	}
 
 	if len(config.Strategy.Steps) == 0 {
-		return false, errors.New("steps cannot be empty")
+		return errors.New("steps cannot be empty")
 	}
 
 	// Steps must be in ascending order and not greater than 100.
 	var previous int64
 	for _, step := range config.Strategy.Steps {
 		if step <= previous || step > 100 {
-			return false, errors.New("steps must be in ascending order and not greater than 100")
+			return errors.New("steps must be in ascending order and not greater than 100")
 		}
 		previous = step
 	}
 
-	for _, criteria := range config.Strategy.Metrics {
-		if valid, err := metricsIsValid(criteria); !valid {
-			return false, errors.Wrap(err, "invalid metrics criteria")
+	for i, criteria := range config.Strategy.Metrics {
+		if err := validateMetrics(criteria); err != nil {
+			return errors.Wrapf(err, "invalid metrics criteria at index %d", i)
 		}
 	}
-	return targetsAreValid(config.Targets)
+	return validateTargets(config.Targets)
 }
 
-func metricsIsValid(metricsCriteria Metric) (bool, error) {
+func validateMetrics(metricsCriteria Metric) error {
 	threshold := metricsCriteria.Threshold
 	switch metricsCriteria.Type {
 	case ErrorRateMetricsCheck:
 		if threshold > 100 || threshold < 0 {
-			return false, errors.Errorf("threshold must be greater than 0 and less than 100 for %q", metricsCriteria.Type)
+			return errors.Errorf("threshold must be greater than 0 and less than 100 for %q", metricsCriteria.Type)
 		}
-		break
 	case LatencyMetricsCheck:
 		percentile := metricsCriteria.Percentile
 		if percentile != 99 && percentile != 95 && percentile != 50 {
-			return false, errors.Errorf("invalid percentile for %q", metricsCriteria.Type)
+			return errors.Errorf("invalid percentile for %q", metricsCriteria.Type)
 		}
 		if metricsCriteria.Threshold < 0 {
-			return false, errors.Errorf("threshold cannot be negative for %q", metricsCriteria.Type)
+			return errors.Errorf("threshold cannot be negative for %q", metricsCriteria.Type)
 		}
-		break
 	default:
-		return false, errors.Errorf("invalid metric criteria %q", metricsCriteria.Type)
+		return errors.Errorf("invalid metric criteria %q", metricsCriteria.Type)
 	}
 
-	return true, nil
+	return nil
 }
 
-func targetsAreValid(targets []*Target) (bool, error) {
+func validateTargets(targets []*Target) error {
 	for _, target := range targets {
 		if target.Project == "" {
-			return false, errors.New("project must be specified in target")
+			return errors.New("project must be specified in target")
 		}
 
 		if target.LabelSelector == "" {
-			return false, errors.New("label must be specified in target")
+			return errors.New("label must be specified in target")
 		}
 	}
 
-	return true, nil
+	return nil
 }
