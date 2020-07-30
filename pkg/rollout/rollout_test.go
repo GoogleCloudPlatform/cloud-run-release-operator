@@ -261,7 +261,7 @@ func TestUpdateService(t *testing.T) {
 	}
 }
 
-func TestRollForward(t *testing.T) {
+func TestPrepareRollForward(t *testing.T) {
 	runclient := &runMocker.RunAPI{}
 	metricsMock := &metricsMocker.Metrics{}
 	strategy := &config.Strategy{
@@ -385,13 +385,13 @@ func TestRollForward(t *testing.T) {
 		r := rollout.New(context.TODO(), metricsMock, svcRecord, strategy).WithClient(runclient)
 
 		t.Run(test.name, func(t *testing.T) {
-			svc = r.RollForward(svc, test.stable, test.candidate)
+			svc = r.PrepareRollForward(svc, test.stable, test.candidate)
 			assert.True(t, cmp.Equal(test.expected, svc.Spec.Traffic))
 		})
 	}
 }
 
-func TestRollback(t *testing.T) {
+func TestPrepareRollback(t *testing.T) {
 	metricsMock := &metricsMocker.Metrics{}
 
 	stable := "test-001"
@@ -413,6 +413,6 @@ func TestRollback(t *testing.T) {
 	svcRecord := &rollout.ServiceRecord{Service: svc}
 
 	r := rollout.New(context.TODO(), metricsMock, svcRecord, &config.Strategy{})
-	svc = r.Rollback(svc, stable, candidate)
+	svc = r.PrepareRollback(svc, stable, candidate)
 	assert.Equal(t, expectedTraffic, svc.Spec.Traffic)
 }

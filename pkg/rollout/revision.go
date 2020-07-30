@@ -83,7 +83,7 @@ func findRevisionWithTag(svc *run.Service, tag string) string {
 //
 // Knowing that a candidate is new is helpful since metrics cannot be obtained
 // about it (it has 0 traffic), so the rollout process should add some initial
-// to the new revision.
+// traffic to the new revision.
 func isNewCandidate(svc *run.Service, currentCandidate string) bool {
 	lastFailedCandidate := svc.Metadata.Annotations[LastFailedCandidateRevisionAnnotation]
 	for _, target := range svc.Spec.Traffic {

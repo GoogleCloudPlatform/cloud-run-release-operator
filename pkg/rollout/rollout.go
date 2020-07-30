@@ -102,7 +102,6 @@ func (r *Rollout) UpdateService(svc *run.Service) (*run.Service, error) {
 		r.log.Info("could not determine stable revision")
 		return nil, nil
 	}
-	r.log.Debugf("%q is the stable revision", stable)
 	r.log = r.log.WithField("stable", stable)
 
 	candidate := DetectCandidateRevisionName(svc, stable)
@@ -110,13 +109,12 @@ func (r *Rollout) UpdateService(svc *run.Service) (*run.Service, error) {
 		r.log.Info("could not determine candidate revision")
 		return nil, nil
 	}
-	r.log.Debugf("%q is the candidate revision", stable)
 	r.log = r.log.WithField("candidate", candidate)
 
 	// A new candidate does not have metrics yet, so it can't be diagnosed.
 	if isNewCandidate(svc, candidate) {
-		r.log.Debug("new candidate found")
-		svc = r.RollForward(svc, stable, candidate)
+		r.log.Debug("candidate is new, will assign it some traffic")
+		svc = r.PrepareRollForward(svc, stable, candidate)
 		svc = r.updateAnnotations(svc, stable, candidate)
 		return r.replaceService(svc)
 	}
@@ -128,23 +126,20 @@ func (r *Rollout) UpdateService(svc *run.Service) (*run.Service, error) {
 	}
 
 	switch diagnosis.OverallResult {
-	case health.Unknown:
-		r.log.Error("unknown candidate's health")
-		return nil, errors.Errorf("got unknown health for candidate %q", candidate)
 	case health.Inconclusive:
-		r.log.Debug("no enough requests to determine health, skipping rollout/rollback for now")
+		r.log.Debug("candidate does not have enough requests to determine health, skipping rollout/rollback for now")
 		return nil, nil
 	case health.Healthy:
-		r.log.Debug("candidate is healthy, will increase traffic to candidate")
-		svc = r.RollForward(svc, stable, candidate)
+		r.log.Debug("candidate is healthy, will increase traffic to it")
+		svc = r.PrepareRollForward(svc, stable, candidate)
 		break
 	case health.Unhealthy:
-		r.log.Infof("candidate did not meet health criteria, will roll back to %q", stable)
+		r.log.Info("candidate is not healthy, will roll back to stable")
 		r.shouldRollback = true
-		svc = r.Rollback(svc, stable, candidate)
+		svc = r.PrepareRollback(svc, stable, candidate)
 		break
 	default:
-		return nil, errors.Errorf("invalid health diagnosis %v", diagnosis.OverallResult)
+		return nil, errors.Errorf("invalid candidate's health diagnosis %v", diagnosis.OverallResult)
 	}
 
 	// TODO(gvso): include annotation about the diagnosis (especially when
@@ -153,13 +148,13 @@ func (r *Rollout) UpdateService(svc *run.Service) (*run.Service, error) {
 	return r.replaceService(svc)
 }
 
-// RollForward changes the traffic configuration of the service to increase the
-// traffic to the candidate.
+// PrepareRollForward changes the traffic configuration of the service to
+// increase the traffic to the candidate.
 //
 // It creates a new traffic configuration for the service. It creates a new
 // traffic configuration for the candidate and stable revisions.
 // The method respects user-defined revision tags.
-func (r *Rollout) RollForward(svc *run.Service, stable, candidate string) *run.Service {
+func (r *Rollout) PrepareRollForward(svc *run.Service, stable, candidate string) *run.Service {
 	r.log.Debug("splitting traffic")
 
 	var traffic []*run.TrafficTarget
@@ -190,8 +185,8 @@ func (r *Rollout) RollForward(svc *run.Service, stable, candidate string) *run.S
 	return svc
 }
 
-// Rollback redirects all the traffic to the stable revision.
-func (r *Rollout) Rollback(svc *run.Service, stable, candidate string) *run.Service {
+// PrepareRollback redirects all the traffic to the stable revision.
+func (r *Rollout) PrepareRollback(svc *run.Service, stable, candidate string) *run.Service {
 	traffic := []*run.TrafficTarget{
 		newTrafficTarget(stable, 100, StableTag),
 		newTrafficTarget(candidate, 0, CandidateTag),
