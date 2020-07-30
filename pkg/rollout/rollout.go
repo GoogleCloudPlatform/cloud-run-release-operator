@@ -310,6 +310,7 @@ func (r *Rollout) diagnoseCandidate(candidate string, healthCriteria []config.Me
 	healthCheckOffset := time.Duration(r.strategy.Interval) * time.Second
 	r.log.Debug("collecting metrics from API")
 	ctx := util.ContextWithLogger(r.ctx, r.log)
+	r.metricsProvider.SetCandidateRevision(candidate)
 	metricsValues, err := health.CollectMetrics(ctx, r.metricsProvider, healthCheckOffset, healthCriteria)
 	if err != nil {
 		return d, errors.Wrap(err, "failed to collect metrics")
