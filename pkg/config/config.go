@@ -1,12 +1,16 @@
 package config
 
+import (
+	"github.com/pkg/errors"
+)
+
 // MetricsCheck is the metrics check type.
 type MetricsCheck string
 
 // Supported metrics checks.
 const (
 	LatencyMetricsCheck   MetricsCheck = "request-latency"
-	ErrorRateMetricsCheck              = "error-rate-percent"
+	ErrorRateMetricsCheck MetricsCheck = "error-rate-percent"
 )
 
 // Target is the configuration to filter services.
@@ -72,38 +76,66 @@ func NewTarget(project string, regions []string, labelSelector string) *Target {
 }
 
 // IsValid checks if the configuration is valid.
-func (config *Config) IsValid(cliMode bool) bool {
-
+func (config *Config) IsValid(cliMode bool) (bool, error) {
 	if cliMode && config.Strategy.Interval <= 0 {
-		return false
+		return false, errors.New("time interval must be greater than 0")
 	}
 
 	if len(config.Strategy.Steps) == 0 {
-		return false
+		return false, errors.New("steps cannot be empty")
 	}
 
 	// Steps must be in ascending order and not greater than 100.
 	var previous int64
 	for _, step := range config.Strategy.Steps {
 		if step <= previous || step > 100 {
-			return false
+			return false, errors.New("steps must be in ascending order and not greater than 100")
 		}
 		previous = step
 	}
 
+	for _, criteria := range config.Strategy.Metrics {
+		if valid, err := metricsIsValid(criteria); !valid {
+			return false, errors.Wrap(err, "invalid metrics criteria")
+		}
+	}
 	return targetsAreValid(config.Targets)
 }
 
-func targetsAreValid(targets []*Target) bool {
+func metricsIsValid(metricsCriteria Metric) (bool, error) {
+	threshold := metricsCriteria.Threshold
+	switch metricsCriteria.Type {
+	case ErrorRateMetricsCheck:
+		if threshold > 100 || threshold < 0 {
+			return false, errors.Errorf("threshold must be greater than 0 and less than 100 for %q", metricsCriteria.Type)
+		}
+		break
+	case LatencyMetricsCheck:
+		percentile := metricsCriteria.Percentile
+		if percentile != 99 && percentile != 95 && percentile != 50 {
+			return false, errors.Errorf("invalid percentile for %q", metricsCriteria.Type)
+		}
+		if metricsCriteria.Threshold < 0 {
+			return false, errors.Errorf("threshold cannot be negative for %q", metricsCriteria.Type)
+		}
+		break
+	default:
+		return false, errors.Errorf("invalid metric criteria %q", metricsCriteria.Type)
+	}
+
+	return true, nil
+}
+
+func targetsAreValid(targets []*Target) (bool, error) {
 	for _, target := range targets {
 		if target.Project == "" {
-			return false
+			return false, errors.New("project must be specified in target")
 		}
 
 		if target.LabelSelector == "" {
-			return false
+			return false, errors.New("label must be specified in target")
 		}
 	}
 
-	return true
+	return true, nil
 }
