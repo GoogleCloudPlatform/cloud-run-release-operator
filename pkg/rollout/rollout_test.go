@@ -48,6 +48,7 @@ func TestUpdateService(t *testing.T) {
 	metricsMock.ErrorRateFn = func(ctx context.Context, offset time.Duration) (float64, error) {
 		return 0.01, nil
 	}
+	metricsMock.SetCandidateRevisionFn = func(revisionName string) {}
 	strategy := &config.Strategy{
 		Steps: []int64{10, 40, 70},
 	}

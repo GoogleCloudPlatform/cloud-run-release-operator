@@ -175,8 +175,8 @@ func (r *Rollout) PrepareRollForward(svc *run.Service, stable, candidate string)
 	traffic = append(traffic, inheritRevisionTags(svc)...)
 
 	if !r.promoteToStable {
-		r.log.Infof("will assign %d%% of the traffic to stable revision %s", stablePercent, stable)
-		r.log.Infof("will assign %d%% of the traffic to candidate revision %s", candidateTraffic.Percent, candidate)
+		r.log.Infof("will assign %d%% of the traffic to stable revision", stablePercent)
+		r.log.Infof("will assign %d%% of the traffic to candidate revision", candidateTraffic.Percent)
 	} else {
 		r.log.Infof("will make revision %s stable", candidate)
 	}
