@@ -102,21 +102,21 @@ func (r *Rollout) UpdateService(svc *run.Service) (*run.Service, error) {
 		r.log.Info("could not determine stable revision")
 		return nil, nil
 	}
-	r.log = r.log.WithField("stable", stable)
 
 	candidate := DetectCandidateRevisionName(svc, stable)
 	if candidate == "" {
 		r.log.Info("could not determine candidate revision")
 		return nil, nil
 	}
-	r.log = r.log.WithField("candidate", candidate)
+	r.log = r.log.WithFields(logrus.Fields{"stable": stable, "candidate": candidate})
 
 	// A new candidate does not have metrics yet, so it can't be diagnosed.
 	if isNewCandidate(svc, candidate) {
-		r.log.Debug("candidate is new, will assign it some traffic")
+		r.log.Debug("new candidate, assign some traffic")
 		svc = r.PrepareRollForward(svc, stable, candidate)
 		svc = r.updateAnnotations(svc, stable, candidate)
-		return r.replaceService(svc)
+		err := r.replaceService(svc)
+		return svc, errors.Wrap(err, "failed to replace service")
 	}
 
 	diagnosis, err := r.diagnoseCandidate(candidate, r.strategy.Metrics)
@@ -127,14 +127,14 @@ func (r *Rollout) UpdateService(svc *run.Service) (*run.Service, error) {
 
 	switch diagnosis.OverallResult {
 	case health.Inconclusive:
-		r.log.Debug("candidate does not have enough requests to determine health, skipping rollout/rollback for now")
+		r.log.Debug("health check inconclusive")
 		return nil, nil
 	case health.Healthy:
-		r.log.Debug("candidate is healthy, will increase traffic to it")
+		r.log.Debug("healthy candidate, roll forward")
 		svc = r.PrepareRollForward(svc, stable, candidate)
 		break
 	case health.Unhealthy:
-		r.log.Info("candidate is not healthy, will roll back to stable")
+		r.log.Info("unhealthy candidate, rollback")
 		r.shouldRollback = true
 		svc = r.PrepareRollback(svc, stable, candidate)
 		break
@@ -145,7 +145,8 @@ func (r *Rollout) UpdateService(svc *run.Service) (*run.Service, error) {
 	// TODO(gvso): include annotation about the diagnosis (especially when
 	// diagnosis is unhealthy).
 	svc = r.updateAnnotations(svc, stable, candidate)
-	return r.replaceService(svc)
+	err = r.replaceService(svc)
+	return svc, errors.Wrap(err, "failed to replace service")
 }
 
 // PrepareRollForward changes the traffic configuration of the service to
@@ -174,11 +175,13 @@ func (r *Rollout) PrepareRollForward(svc *run.Service, stable, candidate string)
 	traffic = append(traffic, candidateTraffic)
 	traffic = append(traffic, inheritRevisionTags(svc)...)
 
-	if !r.promoteToStable {
-		r.log.Infof("will assign %d%% of the traffic to stable revision", stablePercent)
-		r.log.Infof("will assign %d%% of the traffic to candidate revision", candidateTraffic.Percent)
+	if r.promoteToStable {
+		r.log.Infof("will make candidate stable")
 	} else {
-		r.log.Infof("will make revision %s stable", candidate)
+		r.log.WithFields(logrus.Fields{
+			"stablePercent":    stablePercent,
+			"candidatePercent": candidateTraffic.Percent,
+		}).Info("set traffic split")
 	}
 
 	svc.Spec.Traffic = traffic
@@ -198,14 +201,9 @@ func (r *Rollout) PrepareRollback(svc *run.Service, stable, candidate string) *r
 }
 
 // replaceService updates the service object in Cloud Run.
-func (r *Rollout) replaceService(svc *run.Service) (*run.Service, error) {
-	svc, err := r.runClient.ReplaceService(r.project, r.serviceName, svc)
-	if err != nil {
-		return nil, errors.Wrapf(err, "could not update service %q", r.serviceName)
-	}
-	r.log.Debug("service succesfully updated")
-
-	return svc, nil
+func (r *Rollout) replaceService(svc *run.Service) error {
+	_, err := r.runClient.ReplaceService(r.project, r.serviceName, svc)
+	return errors.Wrapf(err, "could not update service %q", r.serviceName)
 }
 
 // newCandidateTraffic returns the next candidate's traffic configuration.
@@ -316,16 +314,9 @@ func (r *Rollout) diagnoseCandidate(candidate string, healthCriteria []config.Me
 		return d, errors.Wrap(err, "failed to collect metrics")
 	}
 
-	r.log.Debug("diagnosing the candidate's health based on the metrics")
+	r.log.Debug("diagnosing candidate's health")
 	d, err = health.Diagnose(ctx, healthCriteria, metricsValues)
-	if err != nil {
-		return d, errors.Wrap(err, "failed to diagnose candidate's health")
-	}
-
-	if d.OverallResult == health.Unknown {
-		return d, errors.New("candidate's health is unknown, did you forget to provide health criteria?")
-	}
-	return d, nil
+	return d, errors.Wrap(err, "failed to diagnose candidate's health")
 }
 
 // newTrafficTarget returns a new traffic target instance.

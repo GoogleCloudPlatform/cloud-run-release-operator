@@ -85,14 +85,14 @@ func findRevisionWithTag(svc *run.Service, tag string) string {
 // about it (it has 0 traffic), so the rollout process should add some initial
 // traffic to the new revision.
 func isNewCandidate(svc *run.Service, currentCandidate string) bool {
-	lastFailedCandidate := svc.Metadata.Annotations[LastFailedCandidateRevisionAnnotation]
 	for _, target := range svc.Spec.Traffic {
 		if target.RevisionName == currentCandidate {
-			return currentCandidate != lastFailedCandidate && target.Percent == 0
+			return target.Percent == 0
 		}
 	}
 
-	// The current candidate was not part of the service traffic config because
-	// it has no traffic.
+	// Cloud Run (often) removes traffic targets for revisions that have no
+	// traffic. If the candidate was not found in the traffic configuration, it
+	// means the revision is a new candidate.
 	return true
 }
