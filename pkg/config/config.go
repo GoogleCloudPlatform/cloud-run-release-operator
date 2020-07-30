@@ -125,13 +125,13 @@ func validateMetrics(metricsCriteria Metric) error {
 }
 
 func validateTargets(targets []*Target) error {
-	for _, target := range targets {
+	for i, target := range targets {
 		if target.Project == "" {
-			return errors.New("project must be specified in target")
+			return errors.Errorf("project must be specified in target at index %d", i)
 		}
 
 		if target.LabelSelector == "" {
-			return errors.New("label must be specified in target")
+			return errors.Errorf("label must be specified in target at index %d", i)
 		}
 	}
 
