@@ -60,6 +60,6 @@ ignore (default: 0)
 - `latency-p50`: Expected maximum latency for 50th percentile of requests, 0 to
 ignore (default: 0)
 
---
+---
 
 This is not an official Google project. See [LICENSE](./LICENSE).
