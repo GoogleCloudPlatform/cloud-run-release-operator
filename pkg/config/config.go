@@ -39,9 +39,9 @@ type Metric struct {
 
 // Strategy is the steps and configuration for rollout.
 type Strategy struct {
-	Steps                []int64
-	HealthCriteria       []Metric
-	HealthIntervalMinute uint64
+	Steps              []int64
+	HealthCriteria     []Metric
+	HealthOffsetMinute int64
 }
 
 // Config contains the configuration for the application.
@@ -54,13 +54,13 @@ type Config struct {
 }
 
 // WithValues initializes a configuration with the given values.
-func WithValues(targets []*Target, steps []int64, healthInterval uint64, metrics []Metric) *Config {
+func WithValues(targets []*Target, steps []int64, healthOffset int64, metrics []Metric) *Config {
 	return &Config{
 		Targets: targets,
 		Strategy: &Strategy{
-			Steps:                steps,
-			HealthCriteria:       metrics,
-			HealthIntervalMinute: healthInterval,
+			Steps:              steps,
+			HealthCriteria:     metrics,
+			HealthOffsetMinute: healthOffset,
 		},
 	}
 }
@@ -76,8 +76,8 @@ func NewTarget(project string, regions []string, labelSelector string) *Target {
 
 // Validate checks if the configuration is valid.
 func (config *Config) Validate(cliMode bool) error {
-	if cliMode && config.Strategy.HealthIntervalMinute <= 0 {
-		return errors.New("health check interval must be greater than 0")
+	if cliMode && config.Strategy.HealthOffsetMinute <= 0 {
+		return errors.New("health check offset must be positive")
 	}
 
 	if len(config.Strategy.Steps) == 0 {
