@@ -63,6 +63,19 @@ func TestDiagnosis(t *testing.T) {
 			},
 		},
 		{
+			name: "only request count criteria, unknown",
+			healthCriteria: []config.Metric{
+				{Type: config.RequestCountMetricsCheck, Threshold: 1000},
+			},
+			results: []float64{1500},
+			expected: health.Diagnosis{
+				OverallResult: health.Unknown,
+				CheckResults: []health.CheckResult{
+					{Threshold: 1000, ActualValue: 1500, IsCriteriaMet: true},
+				},
+			},
+		},
+		{
 			name: "unhealthy revision, miss latency",
 			healthCriteria: []config.Metric{
 				{Type: config.LatencyMetricsCheck, Percentile: 99, Threshold: 499},

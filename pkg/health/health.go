@@ -68,7 +68,7 @@ func Diagnose(ctx context.Context, healthCriteria []config.Metric, actualValues 
 		isMet := isCriteriaMet(criteria.Type, criteria.Threshold, value)
 
 		// For unmet request count, return inconclusive and empty results.
-		if criteria.Type == config.RequestCountMetricsCheck && !isMet {
+		if !isMet && criteria.Type == config.RequestCountMetricsCheck {
 			diagnosis = Inconclusive
 			results = nil
 			break
@@ -83,7 +83,7 @@ func Diagnose(ctx context.Context, healthCriteria []config.Metric, actualValues 
 		}
 
 		// Only switch to healthy once a first criteria is met.
-		if diagnosis == Unknown {
+		if diagnosis == Unknown && criteria.Type != config.RequestCountMetricsCheck {
 			diagnosis = Healthy
 		}
 		result.IsCriteriaMet = true
@@ -137,7 +137,7 @@ func isCriteriaMet(metricsType config.MetricsCheck, threshold float64, actualVal
 
 // requestCount returns the number of requests during the given offset.
 func requestCount(ctx context.Context, provider metrics.Provider, offset time.Duration) (float64, error) {
-	logger := util.LoggerFromContext(ctx)
+	logger := util.LoggerFrom(ctx)
 	logger.Debug("querying for request count metrics")
 	count, err := provider.RequestCount(ctx, offset)
 	return float64(count), errors.Wrap(err, "failed to get request count metrics")
