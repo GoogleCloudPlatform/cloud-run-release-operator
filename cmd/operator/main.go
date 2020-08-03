@@ -57,29 +57,26 @@ func (steps stepFlags) String() string {
 }
 
 var (
-	flLoggingLevel  string
-	flCLI           bool
-	flHTTPAddr      string
-	flProject       string
-	flLabelSelector string
-
-	// Either service or label selection needed.
-	flService string
-	flLabel   string
+	flLoggingLevel       string
+	flCLI                bool
+	flCLILoopIntervalSec uint64
+	flHTTPAddr           string
+	flProject            string
+	flLabelSelector      string
 
 	// Empty array means all regions.
 	flRegions       []string
 	flRegionsString string
 
 	// Rollout strategy-related flags.
-	flSteps           stepFlags
-	flStepsString     string
-	flInterval        int64
-	flMinRequestCount uint64
-	flErrorRate       float64
-	flLatencyP99      float64
-	flLatencyP95      float64
-	flLatencyP50      float64
+	flSteps              stepFlags
+	flStepsString        string
+	flHealthOffsetMinute uint64
+	flMinRequestCount    uint64
+	flErrorRate          float64
+	flLatencyP99         float64
+	flLatencyP95         float64
+	flLatencyP50         float64
 
 	// Metrics provider flags.
 	flGoogleSheetsID string
@@ -94,13 +91,14 @@ func init() {
 	flag.StringVar(&flRegionsString, "regions", "", "the Cloud Run regions where the service should be looked at")
 	flag.Var(&flSteps, "step", "a percentage in traffic the candidate should go through")
 	flag.StringVar(&flStepsString, "steps", "5,20,50,80", "define steps in one flag separated by commas (e.g. 5,30,60)")
-	flag.Int64Var(&flInterval, "interval", 0, "the time between each rollout step")
-	flag.Uint64Var(&flMinRequestCount, "min-requests", 0, "expected minimum requests before determining candidate's health")
-	flag.Float64Var(&flErrorRate, "max-error-rate", 1.0, "expected max server error rate (in percent)")
-	flag.Float64Var(&flLatencyP99, "latency-p99", 0, "expected max latency for 99th percentile of requests (set 0 to ignore)")
-	flag.Float64Var(&flLatencyP95, "latency-p95", 0, "expected max latency for 95th percentile of requests (set 0 to ignore)")
-	flag.Float64Var(&flLatencyP50, "latency-p50", 0, "expected max latency for 50th percentile of requests (set 0 to ignore)")
-	flag.StringVar(&flGoogleSheetsID, "google-sheets", "", "ID of public Google sheets document to use as metrics provider")
+	flag.Uint64Var(&flHealthOffsetMinute, "healthcheck_offset", 10, "use metrics from the last N minutes relative to current rollout process")
+	flag.Uint64Var(&flMinRequestCount, "min_requests", 0, "expected minimum requests before determining candidate's health")
+	flag.Float64Var(&flErrorRate, "max_error_rate", 1.0, "expected max server error rate (in percent)")
+	flag.Float64Var(&flLatencyP99, "latency_p99", 0, "expected max latency for 99th percentile of requests (set 0 to ignore)")
+	flag.Float64Var(&flLatencyP95, "latency_p95", 0, "expected max latency for 95th percentile of requests (set 0 to ignore)")
+	flag.Float64Var(&flLatencyP50, "latency_p50", 0, "expected max latency for 50th percentile of requests (set 0 to ignore)")
+	flag.Uint64Var(&flCLILoopIntervalSec, "cli_run_interval", 60, "the time between each rollout process (in seconds)")
+	flag.StringVar(&flGoogleSheetsID, "google_sheets", "", "ID of public Google sheets document to use as metrics provider")
 	flag.Parse()
 
 	if flRegionsString != "" {
@@ -135,7 +133,7 @@ func main() {
 	target := config.NewTarget(flProject, flRegions, flLabelSelector)
 	healthCriteria := healthCriteriaFromFlags(flMinRequestCount, flErrorRate, flLatencyP99, flLatencyP95, flLatencyP50)
 	printHealthCriteria(logger, healthCriteria)
-	cfg := config.WithValues([]*config.Target{target}, flSteps, flInterval, healthCriteria)
+	cfg := config.WithValues([]*config.Target{target}, flSteps, flHealthOffsetMinute, healthCriteria)
 	if err := cfg.Validate(flCLI); err != nil {
 		logger.Fatalf("invalid rollout configuration: %v", err)
 	}
@@ -186,7 +184,7 @@ func runDaemon(ctx context.Context, logger *logrus.Logger, cfg *config.Config) e
 			logger.Warnf("there were %d errors: %s", len(errs), errsStr)
 		}
 
-		duration := time.Duration(cfg.Strategy.Interval)
+		duration := time.Duration(flCLILoopIntervalSec)
 		time.Sleep(duration * time.Second)
 	}
 }
