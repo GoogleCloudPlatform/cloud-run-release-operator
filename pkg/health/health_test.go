@@ -51,6 +51,18 @@ func TestDiagnosis(t *testing.T) {
 			},
 		},
 		{
+			name: "no enough requests, inconclusive",
+			healthCriteria: []config.Metric{
+				{Type: config.RequestCountMetricsCheck, Threshold: 1000},
+				{Type: config.LatencyMetricsCheck, Percentile: 99, Threshold: 500},
+			},
+			results: []float64{800, 750.0},
+			expected: health.Diagnosis{
+				OverallResult: health.Inconclusive,
+				CheckResults:  nil,
+			},
+		},
+		{
 			name: "unhealthy revision, miss latency",
 			healthCriteria: []config.Metric{
 				{Type: config.LatencyMetricsCheck, Percentile: 99, Threshold: 499},
@@ -133,10 +145,13 @@ func TestDiagnosis(t *testing.T) {
 	}
 }
 
-// TestCollectMetrics tests that the health.CollectMetrics returns the correct
-// values using the metrics provider.
+// TestCollectMetrics tests that health.CollectMetrics returns values using the
+// metrics provider.
 func TestCollectMetrics(t *testing.T) {
 	metricsMock := &metricsMocker.Metrics{}
+	metricsMock.RequestCountFn = func(ctx context.Context, offset time.Duration) (int64, error) {
+		return 1000, nil
+	}
 	metricsMock.LatencyFn = func(ctx context.Context, offset time.Duration, alignReduceType metrics.AlignReduce) (float64, error) {
 		return 500, nil
 	}
@@ -147,12 +162,12 @@ func TestCollectMetrics(t *testing.T) {
 	ctx := context.Background()
 	offset := 5 * time.Minute
 	healthCriteria := []config.Metric{
+		{Type: config.RequestCountMetricsCheck},
 		{Type: config.LatencyMetricsCheck, Percentile: 99},
 		{Type: config.ErrorRateMetricsCheck},
 	}
-	expected := []float64{500.0, 1.0}
-	results, _ := health.CollectMetrics(ctx, metricsMock, offset, healthCriteria)
-	assert.Equal(t, expected, results)
+	expected := []float64{1000, 500.0, 1.0}
 
+	results, _ := health.CollectMetrics(ctx, metricsMock, offset, healthCriteria)
 	assert.Equal(t, expected, results)
 }
