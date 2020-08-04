@@ -10,7 +10,6 @@ import (
 	runMocker "github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/run/mock"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/config"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/rollout"
-	"github.com/google/go-cmp/cmp"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/api/run/v1"
@@ -86,6 +85,7 @@ func TestUpdateService(t *testing.T) {
 				{Type: config.ErrorRateMetricsCheck, Threshold: 5},
 			},
 			outAnnotations: map[string]string{
+				rollout.LastHealthReportAnnotation:  "new candidate, no health report available yet",
 				rollout.StableRevisionAnnotation:    "test-002",
 				rollout.CandidateRevisionAnnotation: "test-003",
 			},
@@ -123,6 +123,7 @@ func TestUpdateService(t *testing.T) {
 			},
 			lastReady: "test-002",
 			outAnnotations: map[string]string{
+				rollout.LastHealthReportAnnotation:  "new candidate, no health report available yet",
 				rollout.StableRevisionAnnotation:    "test-001",
 				rollout.CandidateRevisionAnnotation: "test-002",
 			},
@@ -146,6 +147,9 @@ func TestUpdateService(t *testing.T) {
 				{Type: config.ErrorRateMetricsCheck, Threshold: 5},
 			},
 			outAnnotations: map[string]string{
+				rollout.LastHealthReportAnnotation: `{"diagnosis":"healthy","checkResults":[` +
+					`{"actualValue":500,"isCriteriaMet":true,"metricsType":"request-latency","percentile":99,"threshold":750},` +
+					`{"actualValue":1,"isCriteriaMet":true,"metricsType":"error-rate-percent","threshold":5}]}`,
 				rollout.StableRevisionAnnotation:    "test-001",
 				rollout.CandidateRevisionAnnotation: "test-002",
 			},
@@ -165,6 +169,7 @@ func TestUpdateService(t *testing.T) {
 			},
 			lastReady: "test-003",
 			outAnnotations: map[string]string{
+				rollout.LastHealthReportAnnotation:  "new candidate, no health report available yet",
 				rollout.StableRevisionAnnotation:    "test-001",
 				rollout.CandidateRevisionAnnotation: "test-003",
 			},
@@ -187,6 +192,9 @@ func TestUpdateService(t *testing.T) {
 				{Type: config.ErrorRateMetricsCheck, Threshold: 5},
 			},
 			outAnnotations: map[string]string{
+				rollout.LastHealthReportAnnotation: `{"diagnosis":"healthy","checkResults":[` +
+					`{"actualValue":500,"isCriteriaMet":true,"metricsType":"request-latency","percentile":99,"threshold":750},` +
+					`{"actualValue":1,"isCriteriaMet":true,"metricsType":"error-rate-percent","threshold":5}]}`,
 				rollout.StableRevisionAnnotation: "test-002",
 			},
 			outTraffic: []*run.TrafficTarget{
@@ -207,6 +215,9 @@ func TestUpdateService(t *testing.T) {
 				{Type: config.ErrorRateMetricsCheck, Threshold: 0.95},
 			},
 			outAnnotations: map[string]string{
+				rollout.LastHealthReportAnnotation: `{"diagnosis":"unhealthy","checkResults":[` +
+					`{"actualValue":500,"isCriteriaMet":false,"metricsType":"request-latency","percentile":99,"threshold":100},` +
+					`{"actualValue":1,"isCriteriaMet":false,"metricsType":"error-rate-percent","threshold":0.95}]}`,
 				rollout.StableRevisionAnnotation:              "test-001",
 				rollout.CandidateRevisionAnnotation:           "test-002",
 				rollout.LastFailedCandidateRevisionAnnotation: "test-002",
@@ -285,8 +296,8 @@ func TestUpdateService(t *testing.T) {
 			} else if test.nilService {
 				assert.Nil(t, svc)
 			} else {
-				assert.True(t, cmp.Equal(test.outAnnotations, svc.Metadata.Annotations))
-				assert.True(t, cmp.Equal(test.outTraffic, svc.Spec.Traffic))
+				assert.Equal(t, test.outAnnotations, svc.Metadata.Annotations)
+				assert.Equal(t, test.outTraffic, svc.Spec.Traffic)
 			}
 		})
 
@@ -418,7 +429,7 @@ func TestPrepareRollForward(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			svc = r.PrepareRollForward(svc, test.stable, test.candidate)
-			assert.True(t, cmp.Equal(test.expected, svc.Spec.Traffic))
+			assert.Equal(t, test.expected, svc.Spec.Traffic)
 		})
 	}
 }
