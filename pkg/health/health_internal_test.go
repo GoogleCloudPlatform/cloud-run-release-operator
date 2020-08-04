@@ -41,25 +41,28 @@ func TestIsCriteriaMet(t *testing.T) {
 			metricsType: config.RequestCountMetricsCheck,
 			threshold:   1000,
 			actualValue: 700,
+			expected:    false,
 		},
 		{
 			name:        "unmet latency",
 			metricsType: config.LatencyMetricsCheck,
 			threshold:   750,
 			actualValue: 751,
+			expected:    false,
 		},
 		{
 			name:        "unmet error rate",
 			metricsType: config.ErrorRateMetricsCheck,
 			threshold:   1,
 			actualValue: 1.01,
+			expected:    false,
 		},
 	}
 
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+		t.Run(test.name, func(tt *testing.T) {
 			isMet := isCriteriaMet(test.metricsType, test.threshold, test.actualValue)
-			assert.Equal(t, test.expected, isMet)
+			assert.Equal(tt, test.expected, isMet)
 		})
 	}
 }

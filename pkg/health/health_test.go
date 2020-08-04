@@ -146,13 +146,13 @@ func TestDiagnosis(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+		t.Run(test.name, func(tt *testing.T) {
 			ctx := context.Background()
 			diagnosis, err := health.Diagnose(ctx, test.healthCriteria, test.results)
 			if test.shouldErr {
-				assert.NotNil(t, err)
+				assert.NotNil(tt, err)
 			} else {
-				assert.Equal(t, test.expected, diagnosis)
+				assert.Equal(tt, test.expected, diagnosis)
 			}
 		})
 	}
@@ -181,6 +181,7 @@ func TestCollectMetrics(t *testing.T) {
 	}
 	expected := []float64{1000, 500.0, 1.0}
 
-	results, _ := health.CollectMetrics(ctx, metricsMock, offset, healthCriteria)
+	results, err := health.CollectMetrics(ctx, metricsMock, offset, healthCriteria)
+	assert.Nil(t, err)
 	assert.Equal(t, expected, results)
 }
