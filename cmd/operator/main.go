@@ -17,19 +17,16 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/metrics"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/metrics/sheets"
-	runapi "github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/run"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/stackdriver"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/config"
-	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/rollout"
 	sdlog "github.com/TV4/logrus-stackdriver-formatter"
 	isatty "github.com/mattn/go-isatty"
 	"github.com/pkg/errors"
@@ -145,6 +142,9 @@ func main() {
 			logger.Fatalf("error when running daemon: %v", err)
 		}
 	}
+
+	http.HandleFunc("/", makeRolloutHandler(logger, cfg))
+	logger.Fatal(http.ListenAndServe(flHTTPAddr, nil))
 }
 
 func runDaemon(ctx context.Context, logger *logrus.Logger, cfg *config.Config) error {
@@ -157,29 +157,8 @@ func runDaemon(ctx context.Context, logger *logrus.Logger, cfg *config.Config) e
 			logger.Warn("no service matches the targets")
 		}
 
-		var (
-			errs []error
-			mu   sync.Mutex
-			wg   sync.WaitGroup
-		)
-		for _, service := range services {
-			wg.Add(1)
-			go func(ctx context.Context, lg *logrus.Logger, svc *rollout.ServiceRecord, strategy *config.Strategy) {
-				err = handleRollout(ctx, lg, svc, strategy)
-				if err != nil {
-					mu.Lock()
-					errs = append(errs, err)
-					mu.Unlock()
-				}
-				wg.Done()
-			}(ctx, logger, service, cfg.Strategy)
-		}
-		wg.Wait()
-
-		var errsStr string
-		for i, err := range errs {
-			errsStr += fmt.Sprintf("\n[error#%d] %v", i, err)
-		}
+		errs := runRollouts(ctx, logger, services, cfg.Strategy)
+		errsStr := rolloutErrsToString(errs)
 		if len(errs) != 0 {
 			logger.Warnf("there were %d errors: %s", len(errs), errsStr)
 		}
@@ -187,38 +166,6 @@ func runDaemon(ctx context.Context, logger *logrus.Logger, cfg *config.Config) e
 		duration := time.Duration(flCLILoopIntervalSec)
 		time.Sleep(duration * time.Second)
 	}
-}
-
-// handleRollout manages the rollout process for a single service.
-func handleRollout(ctx context.Context, logger *logrus.Logger, service *rollout.ServiceRecord, strategy *config.Strategy) error {
-	lg := logger.WithFields(logrus.Fields{
-		"project": service.Project,
-		"service": service.Metadata.Name,
-		"region":  service.Region,
-	})
-
-	client, err := runapi.NewAPIClient(ctx, service.Region)
-	if err != nil {
-		return errors.Wrap(err, "failed to initialize Cloud Run API client")
-	}
-	metricsProvider, err := chooseMetricsProvider(ctx, lg, service.Project, service.Region, service.Metadata.Name)
-	if err != nil {
-		return errors.Wrap(err, "failed to initialize metrics provider")
-	}
-	roll := rollout.New(ctx, metricsProvider, service, strategy).WithClient(client).WithLogger(lg.Logger)
-
-	changed, err := roll.Rollout()
-	if err != nil {
-		logger.Errorf("rollout failed, error=%v", err)
-		return errors.Wrap(err, "rollout failed")
-	}
-
-	if changed {
-		lg.Info("service was successfully updated")
-	} else {
-		lg.Debug("service kept unchanged")
-	}
-	return nil
 }
 
 func flagsAreValid() (bool, error) {
@@ -294,10 +241,8 @@ func printHealthCriteria(logger *logrus.Logger, healthCriteria []config.Metric) 
 		switch criteria.Type {
 		case config.ErrorRateMetricsCheck:
 			lg.Debug("found health criterion")
-			break
 		case config.LatencyMetricsCheck:
 			lg.WithField("percentile", criteria.Percentile).Debug("found health criterion")
-			break
 		default:
 			lg.Debug("invalid health criterion")
 		}
