@@ -143,7 +143,8 @@ func main() {
 		}
 	}
 
-	http.HandleFunc("/", makeRolloutHandler(logger, cfg))
+	http.HandleFunc("/rollout", makeRolloutHandler(logger, cfg))
+	logger.Infof("starting server at %s", flHTTPAddr)
 	logger.Fatal(http.ListenAndServe(flHTTPAddr, nil))
 }
 
