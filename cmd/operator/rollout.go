@@ -13,7 +13,15 @@ import (
 )
 
 // runRollouts concurrently handles the rollout of the targeted services.
-func runRollouts(ctx context.Context, logger *logrus.Logger, svcs []*rollout.ServiceRecord, strategy *config.Strategy) []error {
+func runRollouts(ctx context.Context, logger *logrus.Logger, cfg *config.Config) []error {
+	svcs, err := getTargetedServices(ctx, logger, cfg.Targets)
+	if err != nil {
+		return []error{errors.Wrap(err, "failed to get targeted services")}
+	}
+	if len(svcs) == 0 {
+		logger.Warn("no service matches the targets")
+	}
+
 	var (
 		errs []error
 		mu   sync.Mutex
@@ -22,14 +30,14 @@ func runRollouts(ctx context.Context, logger *logrus.Logger, svcs []*rollout.Ser
 	for _, svc := range svcs {
 		wg.Add(1)
 		go func(ctx context.Context, lg *logrus.Logger, svc *rollout.ServiceRecord, strategy *config.Strategy) {
+			defer wg.Done()
 			err := handleRollout(ctx, lg, svc, strategy)
 			if err != nil {
 				mu.Lock()
 				errs = append(errs, err)
 				mu.Unlock()
 			}
-			wg.Done()
-		}(ctx, logger, svc, strategy)
+		}(ctx, logger, svc, cfg.Strategy)
 	}
 	wg.Wait()
 
