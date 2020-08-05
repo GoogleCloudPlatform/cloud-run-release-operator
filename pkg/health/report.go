@@ -8,10 +8,9 @@ import (
 	"github.com/pkg/errors"
 )
 
-// StringReport report generates a human-readable report of the diagnosis.
+// StringReport returns a human-readable report of the diagnosis.
 //
 // The returned string has the format:
-//
 // status: healthy
 // metrics:
 // - request-latency[p99]: 500.00 (threshold 750.0)
