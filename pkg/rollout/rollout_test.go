@@ -147,7 +147,7 @@ func TestUpdateService(t *testing.T) {
 				{Type: config.ErrorRateMetricsCheck, Threshold: 5},
 			},
 			outAnnotations: map[string]string{
-				rollout.LastHealthReportAnnotation: "last status: healthy\n" +
+				rollout.LastHealthReportAnnotation: "status: healthy\n" +
 					"metrics:" +
 					"\n- request-latency[p99]: 500.00 (threshold 750.00)" +
 					"\n- error-rate-percent: 1.00 (threshold 5.00)",
@@ -193,7 +193,7 @@ func TestUpdateService(t *testing.T) {
 				{Type: config.ErrorRateMetricsCheck, Threshold: 5},
 			},
 			outAnnotations: map[string]string{
-				rollout.LastHealthReportAnnotation: "last status: healthy\n" +
+				rollout.LastHealthReportAnnotation: "status: healthy\n" +
 					"metrics:" +
 					"\n- request-latency[p99]: 500.00 (threshold 750.00)" +
 					"\n- error-rate-percent: 1.00 (threshold 5.00)",
@@ -217,7 +217,7 @@ func TestUpdateService(t *testing.T) {
 				{Type: config.ErrorRateMetricsCheck, Threshold: 0.95},
 			},
 			outAnnotations: map[string]string{
-				rollout.LastHealthReportAnnotation: "last status: unhealthy\n" +
+				rollout.LastHealthReportAnnotation: "status: unhealthy\n" +
 					"metrics:" +
 					"\n- request-latency[p99]: 500.00 (threshold 100.00)" +
 					"\n- error-rate-percent: 1.00 (threshold 0.95)",

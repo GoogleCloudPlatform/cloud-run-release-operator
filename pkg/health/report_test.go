@@ -26,7 +26,7 @@ func TestStringReport(t *testing.T) {
 					{Threshold: 750, ActualValue: 1000, IsCriteriaMet: true},
 				},
 			},
-			expected: "last status: unhealthy\n" +
+			expected: "status: unhealthy\n" +
 				"metrics:" +
 				"\n- request-latency[p99]: 1000.00 (threshold 750.00)",
 		},
@@ -45,7 +45,7 @@ func TestStringReport(t *testing.T) {
 					{Threshold: 5, ActualValue: 2, IsCriteriaMet: true},
 				},
 			},
-			expected: "last status: healthy\n" +
+			expected: "status: healthy\n" +
 				"metrics:" +
 				"\n- request-count: 1500 (threshold 1000)" +
 				"\n- request-latency[p99]: 500.00 (threshold 750.00)" +
@@ -53,7 +53,7 @@ func TestStringReport(t *testing.T) {
 		},
 		{
 			name:     "no metrics",
-			expected: "last status: unknown\nmetrics:",
+			expected: "status: unknown\nmetrics:",
 		},
 	}
 

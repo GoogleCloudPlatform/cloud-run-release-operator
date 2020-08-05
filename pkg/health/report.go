@@ -12,12 +12,12 @@ import (
 //
 // The returned string has the format:
 //
-// last status: healthy
+// status: healthy
 // metrics:
 // - request-latency[p99]: 500.00 (threshold 750.0)
 // - request-count: 800 (threshold 1000)
 func StringReport(healthCriteria []config.Metric, diagnosis Diagnosis) string {
-	report := fmt.Sprintf("last status: %s\n", diagnosis.OverallResult.String())
+	report := fmt.Sprintf("status: %s\n", diagnosis.OverallResult.String())
 	report += "metrics:"
 	for i, result := range diagnosis.CheckResults {
 		criteria := healthCriteria[i]
