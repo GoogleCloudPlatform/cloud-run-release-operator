@@ -136,9 +136,9 @@ func main() {
 
 	// Configuration.
 	target := config.NewTarget(flProject, flRegions, flLabelSelector)
-	healthCriteria := healthCriteriaFromFlags(flMinRequestCount, flMinForwardTimeMinute, flErrorRate, flLatencyP99, flLatencyP95, flLatencyP50)
+	healthCriteria := healthCriteriaFromFlags(flMinRequestCount, flErrorRate, flLatencyP99, flLatencyP95, flLatencyP50)
 	printHealthCriteria(logger, healthCriteria)
-	cfg := config.WithValues([]*config.Target{target}, flSteps, flHealthOffsetMinute, healthCriteria)
+	cfg := config.WithValues([]*config.Target{target}, flSteps, flHealthOffsetMinute, flMinForwardTimeMinute, healthCriteria)
 	if err := cfg.Validate(flCLI); err != nil {
 		logger.Fatalf("invalid rollout configuration: %v", err)
 	}
@@ -203,11 +203,10 @@ func chooseMetricsProvider(ctx context.Context, logger *logrus.Entry, project, r
 
 // healthCriteriaFromFlags checks the metrics-related flags and return an array
 // of config.Metric based on them.
-func healthCriteriaFromFlags(requestCount, rollForwardTime int, errorRate, latencyP99, latencyP95, latencyP50 float64) []config.Metric {
+func healthCriteriaFromFlags(requestCount int, errorRate, latencyP99, latencyP95, latencyP50 float64) []config.Metric {
 	metrics := []config.Metric{
-		{Type: config.TimeRollForwardMetricsCheck, Threshold: float64(rollForwardTime)},
-		{Type: config.RequestCountMetricsCheck, Threshold: float64(requestCount)},
 		{Type: config.ErrorRateMetricsCheck, Threshold: errorRate},
+		{Type: config.RequestCountMetricsCheck, Threshold: float64(requestCount)},
 	}
 
 	if latencyP99 > 0 {

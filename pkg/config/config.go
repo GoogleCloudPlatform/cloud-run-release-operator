@@ -9,10 +9,9 @@ type MetricsCheck string
 
 // Supported metrics checks.
 const (
-	TimeRollForwardMetricsCheck MetricsCheck = "time-to-roll-forward"
-	RequestCountMetricsCheck    MetricsCheck = "request-count"
-	LatencyMetricsCheck         MetricsCheck = "request-latency"
-	ErrorRateMetricsCheck       MetricsCheck = "error-rate-percent"
+	RequestCountMetricsCheck MetricsCheck = "request-count"
+	LatencyMetricsCheck      MetricsCheck = "request-latency"
+	ErrorRateMetricsCheck    MetricsCheck = "error-rate-percent"
 )
 
 // Target is the configuration to filter services.
@@ -40,9 +39,10 @@ type Metric struct {
 
 // Strategy is the steps and configuration for rollout.
 type Strategy struct {
-	Steps              []int64
-	HealthCriteria     []Metric
-	HealthOffsetMinute int
+	Steps                 []int64
+	HealthCriteria        []Metric
+	HealthOffsetMinute    int
+	TimeRollForwardMinute int
 }
 
 // Config contains the configuration for the application.
@@ -55,13 +55,14 @@ type Config struct {
 }
 
 // WithValues initializes a configuration with the given values.
-func WithValues(targets []*Target, steps []int64, healthOffset int, metrics []Metric) *Config {
+func WithValues(targets []*Target, steps []int64, healthOffset, timeForward int, metrics []Metric) *Config {
 	return &Config{
 		Targets: targets,
 		Strategy: &Strategy{
-			Steps:              steps,
-			HealthCriteria:     metrics,
-			HealthOffsetMinute: healthOffset,
+			Steps:                 steps,
+			HealthCriteria:        metrics,
+			HealthOffsetMinute:    healthOffset,
+			TimeRollForwardMinute: timeForward,
 		},
 	}
 }
@@ -118,7 +119,7 @@ func validateMetrics(metricsCriteria Metric) error {
 		if percentile != 99 && percentile != 95 && percentile != 50 {
 			return errors.Errorf("invalid percentile for %q", metricsCriteria.Type)
 		}
-	case TimeRollForwardMetricsCheck, RequestCountMetricsCheck:
+	case RequestCountMetricsCheck:
 		return nil
 	default:
 		return errors.Errorf("invalid metric criteria %q", metricsCriteria.Type)
