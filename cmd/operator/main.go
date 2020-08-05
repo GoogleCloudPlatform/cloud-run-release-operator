@@ -58,7 +58,7 @@ var (
 	flLoggingLevel       string
 	flCLI                bool
 	flCLILoopIntervalSec int
-	flPort               int
+	flHTTPAddr           string
 	flProject            string
 	flLabelSelector      string
 
@@ -81,19 +81,15 @@ var (
 )
 
 func init() {
-	defaultPort := 8080
+	defaultAddr := ":8080"
 	if v := os.Getenv("PORT"); v != "" {
-		var err error
-		defaultPort, err = strconv.Atoi(v)
-		if err != nil {
-			logrus.WithField("v", v).Fatalf("invalid PORT environment variable, expected int")
-		}
+		defaultAddr = fmt.Sprintf(":%s", v)
 	}
 
 	flag.StringVar(&flLoggingLevel, "verbosity", "info", "the logging level (e.g. debug)")
 	flag.BoolVar(&flCLI, "cli", false, "run as CLI application to manage rollout in intervals")
 	flag.IntVar(&flCLILoopIntervalSec, "cli-run-interval", 60, "the time between each rollout process (in seconds)")
-	flag.IntVar(&flPort, "-port", defaultPort, "port where to listen to http requests (e.g. 8080)")
+	flag.StringVar(&flHTTPAddr, "http-addr", defaultAddr, "port where to listen to http requests (e.g. 8080)")
 	flag.StringVar(&flProject, "project", "", "project in which the service is deployed")
 	flag.StringVar(&flLabelSelector, "label", "rollout-strategy=gradual", "filter services based on a label (e.g. team=backend)")
 	flag.StringVar(&flRegionsString, "regions", "", "the Cloud Run regions where the service should be looked at")
@@ -150,9 +146,8 @@ func main() {
 		runDaemon(ctx, logger, cfg)
 	} else {
 		http.HandleFunc("/rollout", makeRolloutHandler(logger, cfg))
-		logger.WithField("port", flPort).Infof("starting server")
-		port := fmt.Sprintf(":%d", flPort)
-		logger.Fatal(http.ListenAndServe(port, nil))
+		logger.WithField("addr", flHTTPAddr).Infof("starting server")
+		logger.Fatal(http.ListenAndServe(flHTTPAddr, nil))
 	}
 }
 
