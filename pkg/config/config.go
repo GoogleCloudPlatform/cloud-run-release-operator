@@ -9,9 +9,10 @@ type MetricsCheck string
 
 // Supported metrics checks.
 const (
-	RequestCountMetricsCheck MetricsCheck = "request-count"
-	LatencyMetricsCheck      MetricsCheck = "request-latency"
-	ErrorRateMetricsCheck    MetricsCheck = "error-rate-percent"
+	TimeRollForwardMetricsCheck MetricsCheck = "time-to-roll-forward"
+	RequestCountMetricsCheck    MetricsCheck = "request-count"
+	LatencyMetricsCheck         MetricsCheck = "request-latency"
+	ErrorRateMetricsCheck       MetricsCheck = "error-rate-percent"
 )
 
 // Target is the configuration to filter services.
@@ -117,7 +118,7 @@ func validateMetrics(metricsCriteria Metric) error {
 		if percentile != 99 && percentile != 95 && percentile != 50 {
 			return errors.Errorf("invalid percentile for %q", metricsCriteria.Type)
 		}
-	case RequestCountMetricsCheck:
+	case TimeRollForwardMetricsCheck, RequestCountMetricsCheck:
 		return nil
 	default:
 		return errors.Errorf("invalid metric criteria %q", metricsCriteria.Type)
