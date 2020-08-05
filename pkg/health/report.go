@@ -40,6 +40,9 @@ func StringReport(healthCriteria []config.Metric, diagnosis Diagnosis) string {
 }
 
 // JSONReport returns a JSON representation of the diagnosis.
+//
+// TODO: consider if this function is useful (e.g. for a dashboard) since it's
+// not used anywhere yet.
 func JSONReport(healthCriteria []config.Metric, diagnosis Diagnosis) (string, error) {
 	var resultsMap []map[string]interface{}
 	for i, result := range diagnosis.CheckResults {
