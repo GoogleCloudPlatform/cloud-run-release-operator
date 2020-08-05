@@ -15,7 +15,7 @@ func makeRolloutHandler(logger *logrus.Logger, cfg *config.Config) http.HandlerF
 		errs := runRollouts(ctx, logger, cfg)
 		errsStr := rolloutErrsToString(errs)
 		if len(errs) != 0 {
-			msg := fmt.Sprintf("there were %d errors: %s", len(errs), errsStr)
+			msg := fmt.Sprintf("there were %d errors: \n%s", len(errs), errsStr)
 			logger.Warn(msg)
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprint(w, msg)

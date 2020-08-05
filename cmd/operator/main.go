@@ -89,7 +89,7 @@ func init() {
 	flag.StringVar(&flLoggingLevel, "verbosity", "info", "the logging level (e.g. debug)")
 	flag.BoolVar(&flCLI, "cli", false, "run as CLI application to manage rollout in intervals")
 	flag.IntVar(&flCLILoopIntervalSec, "cli-run-interval", 60, "the time between each rollout process (in seconds)")
-	flag.StringVar(&flHTTPAddr, "http-addr", defaultAddr, "port where to listen to http requests (e.g. 8080)")
+	flag.StringVar(&flHTTPAddr, "http-addr", defaultAddr, "address where to listen to http requests (e.g. :8080)")
 	flag.StringVar(&flProject, "project", "", "project in which the service is deployed")
 	flag.StringVar(&flLabelSelector, "label", "rollout-strategy=gradual", "filter services based on a label (e.g. team=backend)")
 	flag.StringVar(&flRegionsString, "regions", "", "the Cloud Run regions where the service should be looked at")
@@ -156,7 +156,7 @@ func runDaemon(ctx context.Context, logger *logrus.Logger, cfg *config.Config) {
 		errs := runRollouts(ctx, logger, cfg)
 		errsStr := rolloutErrsToString(errs)
 		if len(errs) != 0 {
-			logger.Warnf("there were %d errors: %s", len(errs), errsStr)
+			logger.Warnf("there were %d errors: \n%s", len(errs), errsStr)
 		}
 
 		duration := time.Duration(flCLILoopIntervalSec)

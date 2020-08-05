@@ -33,6 +33,7 @@ func runRollouts(ctx context.Context, logger *logrus.Logger, cfg *config.Config)
 			defer wg.Done()
 			err := handleRollout(ctx, lg, svc, strategy)
 			if err != nil {
+				lg.Debugf("rollout error for service %q: %+v", svc.Service.Metadata.Name, err)
 				mu.Lock()
 				errs = append(errs, err)
 				mu.Unlock()
@@ -80,7 +81,10 @@ func handleRollout(ctx context.Context, logger *logrus.Logger, service *rollout.
 // during the rollout of all targeted services.
 func rolloutErrsToString(errs []error) (errsStr string) {
 	for i, err := range errs {
-		errsStr += fmt.Sprintf("\n[error#%d] %v", i, err)
+		if i > 0 {
+			errsStr += "\n"
+		}
+		errsStr += fmt.Sprintf("[error#%d] %v", i, err)
 	}
 	return errsStr
 }
