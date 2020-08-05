@@ -59,7 +59,7 @@ func (steps stepFlags) String() string {
 var (
 	flLoggingLevel       string
 	flCLI                bool
-	flCLILoopIntervalSec int64
+	flCLILoopIntervalSec int
 	flHTTPAddr           string
 	flProject            string
 	flLabelSelector      string
@@ -71,8 +71,8 @@ var (
 	// Rollout strategy-related flags.
 	flSteps              stepFlags
 	flStepsString        string
-	flHealthOffsetMinute int64
-	flMinRequestCount    uint64
+	flHealthOffsetMinute int
+	flMinRequestCount    int
 	flErrorRate          float64
 	flLatencyP99         float64
 	flLatencyP95         float64
@@ -85,19 +85,19 @@ var (
 func init() {
 	flag.StringVar(&flLoggingLevel, "verbosity", "info", "the logging level (e.g. debug)")
 	flag.BoolVar(&flCLI, "cli", false, "run as CLI application to manage rollout in intervals")
+	flag.IntVar(&flCLILoopIntervalSec, "cli-run-interval", 60, "the time between each rollout process (in seconds)")
 	flag.StringVar(&flHTTPAddr, "http-addr", "", "listen on http portrun on request (e.g. :8080)")
 	flag.StringVar(&flProject, "project", "", "project in which the service is deployed")
 	flag.StringVar(&flLabelSelector, "label", "rollout-strategy=gradual", "filter services based on a label (e.g. team=backend)")
 	flag.StringVar(&flRegionsString, "regions", "", "the Cloud Run regions where the service should be looked at")
 	flag.Var(&flSteps, "step", "a percentage in traffic the candidate should go through")
 	flag.StringVar(&flStepsString, "steps", "5,20,50,80", "define steps in one flag separated by commas (e.g. 5,30,60)")
-	flag.Int64Var(&flHealthOffsetMinute, "healthcheck-offset", 10, "use metrics from the last N minutes relative to current rollout process")
-	flag.Uint64Var(&flMinRequestCount, "min-requests", 0, "expected minimum requests before determining candidate's health")
+	flag.IntVar(&flHealthOffsetMinute, "healthcheck-offset", 30, "use metrics from the last N minutes relative to current rollout process")
+	flag.IntVar(&flMinRequestCount, "min-requests", 0, "expected minimum requests before determining candidate's health")
 	flag.Float64Var(&flErrorRate, "max-error-rate", 1.0, "expected max server error rate (in percent)")
 	flag.Float64Var(&flLatencyP99, "latency-p99", 0, "expected max latency for 99th percentile of requests (set 0 to ignore)")
 	flag.Float64Var(&flLatencyP95, "latency-p95", 0, "expected max latency for 95th percentile of requests (set 0 to ignore)")
 	flag.Float64Var(&flLatencyP50, "latency-p50", 0, "expected max latency for 50th percentile of requests (set 0 to ignore)")
-	flag.Int64Var(&flCLILoopIntervalSec, "cli-run-interval", 60, "the time between each rollout process (in seconds)")
 	flag.StringVar(&flGoogleSheetsID, "google-sheets", "", "ID of public Google sheets document to use as metrics provider")
 	flag.Parse()
 
@@ -265,7 +265,7 @@ func chooseMetricsProvider(ctx context.Context, logger *logrus.Entry, project, r
 
 // healthCriteriaFromFlags checks the metrics-related flags and return an array
 // of config.Metric based on them.
-func healthCriteriaFromFlags(requestCount uint64, errorRate, latencyP99, latencyP95, latencyP50 float64) []config.Metric {
+func healthCriteriaFromFlags(requestCount int, errorRate, latencyP99, latencyP95, latencyP50 float64) []config.Metric {
 	metrics := []config.Metric{
 		{Type: config.ErrorRateMetricsCheck, Threshold: errorRate},
 		{Type: config.RequestCountMetricsCheck, Threshold: float64(requestCount)},
