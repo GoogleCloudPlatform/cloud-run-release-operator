@@ -148,10 +148,7 @@ func (r *Rollout) UpdateService(svc *run.Service) (*run.Service, error) {
 		return nil, errors.Errorf("invalid candidate's health diagnosis %v", diagnosis.OverallResult)
 	}
 
-	report, err := health.JSONReport(r.strategy.HealthCriteria, diagnosis)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to generate health report")
-	}
+	report := health.StringReport(r.strategy.HealthCriteria, diagnosis)
 	svc = r.updateAnnotations(svc, stable, candidate, report)
 	err = r.replaceService(svc)
 	return svc, errors.Wrap(err, "failed to replace service")

@@ -147,9 +147,10 @@ func TestUpdateService(t *testing.T) {
 				{Type: config.ErrorRateMetricsCheck, Threshold: 5},
 			},
 			outAnnotations: map[string]string{
-				rollout.LastHealthReportAnnotation: `{"diagnosis":"healthy","checkResults":[` +
-					`{"actualValue":500,"isCriteriaMet":true,"metricsType":"request-latency","percentile":99,"threshold":750},` +
-					`{"actualValue":1,"isCriteriaMet":true,"metricsType":"error-rate-percent","threshold":5}]}`,
+				rollout.LastHealthReportAnnotation: "last status: healthy\n" +
+					"metrics:" +
+					"\n- request-latency[p99]: 500.00 (threshold 750.00)" +
+					"\n- error-rate-percent: 1.00 (threshold 5.00)",
 				rollout.StableRevisionAnnotation:    "test-001",
 				rollout.CandidateRevisionAnnotation: "test-002",
 			},
@@ -192,9 +193,10 @@ func TestUpdateService(t *testing.T) {
 				{Type: config.ErrorRateMetricsCheck, Threshold: 5},
 			},
 			outAnnotations: map[string]string{
-				rollout.LastHealthReportAnnotation: `{"diagnosis":"healthy","checkResults":[` +
-					`{"actualValue":500,"isCriteriaMet":true,"metricsType":"request-latency","percentile":99,"threshold":750},` +
-					`{"actualValue":1,"isCriteriaMet":true,"metricsType":"error-rate-percent","threshold":5}]}`,
+				rollout.LastHealthReportAnnotation: "last status: healthy\n" +
+					"metrics:" +
+					"\n- request-latency[p99]: 500.00 (threshold 750.00)" +
+					"\n- error-rate-percent: 1.00 (threshold 5.00)",
 				rollout.StableRevisionAnnotation: "test-002",
 			},
 			outTraffic: []*run.TrafficTarget{
@@ -215,9 +217,10 @@ func TestUpdateService(t *testing.T) {
 				{Type: config.ErrorRateMetricsCheck, Threshold: 0.95},
 			},
 			outAnnotations: map[string]string{
-				rollout.LastHealthReportAnnotation: `{"diagnosis":"unhealthy","checkResults":[` +
-					`{"actualValue":500,"isCriteriaMet":false,"metricsType":"request-latency","percentile":99,"threshold":100},` +
-					`{"actualValue":1,"isCriteriaMet":false,"metricsType":"error-rate-percent","threshold":0.95}]}`,
+				rollout.LastHealthReportAnnotation: "last status: unhealthy\n" +
+					"metrics:" +
+					"\n- request-latency[p99]: 500.00 (threshold 100.00)" +
+					"\n- error-rate-percent: 1.00 (threshold 0.95)",
 				rollout.StableRevisionAnnotation:              "test-001",
 				rollout.CandidateRevisionAnnotation:           "test-002",
 				rollout.LastFailedCandidateRevisionAnnotation: "test-002",
