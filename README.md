@@ -13,10 +13,11 @@ Once you run this command, it will check the health of Cloud Run services with
 the label `rollout-strategy=gradual` every minute by looking at the candidate's
 metrics for the past 30 minutes by default.
 
-The health is determined using the metrics and configured health criteria. Based
-on the health result, the candidate will be rolled forward or back
-automatically. By default, the only health criteria is a expected max server
-error rate of 1%.
+- The health is determined using the metrics and configured health criteria
+- By default, the only health criteria is a expected max server error rate of
+1%
+- If metrics show a healthy candidate, traffic to candidate is increased
+- If metrics show an unhealthy candidate, a roll back is performed
 
 ## How does it work?
 
