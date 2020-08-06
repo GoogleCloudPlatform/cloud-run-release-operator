@@ -232,12 +232,13 @@ func (r *Rollout) updateServiceBasedOnDiagnosis(svc *run.Service, diagnosis heal
 		return nil, nil
 	case health.Healthy:
 		r.log.Debug("healthy candidate")
-		enoughTime, err := r.hasEnoughTimeElapsed(svc.Metadata.Annotations[LastRolloutAnnotation], r.strategy.TimeBetweenRollouts)
+		lastRollout := svc.Metadata.Annotations[LastRolloutAnnotation]
+		enoughTime, err := r.hasEnoughTimeElapsed(lastRollout, r.strategy.TimeBetweenRollouts)
 		if err != nil {
 			return nil, errors.Wrap(err, "could not determine if roll out is allowed")
 		}
 		if !enoughTime {
-			r.log.Debug("no enough time since last roll out, service unchanged")
+			r.log.WithField("lastRollout", lastRollout).Debug("no enough time elapsed since last roll out")
 			return nil, nil
 		}
 		r.log.Debug("rolling forward")

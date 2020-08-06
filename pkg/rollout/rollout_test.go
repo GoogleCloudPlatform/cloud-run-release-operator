@@ -81,8 +81,6 @@ func TestUpdateService(t *testing.T) {
 		shouldErr      bool
 		nilService     bool
 	}{
-		// There is a revision with 100% of traffic different from stable and candidate.
-		// Make it the stable revision.
 		{
 			name: "stable revision based on traffic share",
 			traffic: []*run.TrafficTarget{
@@ -107,7 +105,6 @@ func TestUpdateService(t *testing.T) {
 				{LatestRevision: true, Tag: rollout.LatestTag},
 			},
 		},
-		// There's no a stable revision nor a revision handling 100% of traffic.
 		{
 			name: "no stable revision",
 			traffic: []*run.TrafficTarget{
@@ -117,7 +114,6 @@ func TestUpdateService(t *testing.T) {
 			lastReady:  "test-002",
 			nilService: true,
 		},
-		// Stable revision is the same as the latest revision. There's no candidate.
 		{
 			name: "same stable and latest revision",
 			traffic: []*run.TrafficTarget{
@@ -126,7 +122,6 @@ func TestUpdateService(t *testing.T) {
 			lastReady:  "test-001",
 			nilService: true,
 		},
-		// Candidate is new with non-existing previous candidate.
 		{
 			name: "new candidate and non-existing previous candidate",
 			traffic: []*run.TrafficTarget{
@@ -146,7 +141,6 @@ func TestUpdateService(t *testing.T) {
 				{LatestRevision: true, Tag: rollout.LatestTag},
 			},
 		},
-		// Candidate is the same as before (and healthy), keep rolling forward.
 		{
 			name: "keep rolling forward the same candidate",
 			traffic: []*run.TrafficTarget{
@@ -224,7 +218,6 @@ func TestUpdateService(t *testing.T) {
 				{LatestRevision: true, Tag: rollout.LatestTag},
 			},
 		},
-		// Candidate was handling 100% of traffic. It's now ready to become stable.
 		{
 			name: "candidate is ready to become stable",
 			traffic: []*run.TrafficTarget{
@@ -252,7 +245,6 @@ func TestUpdateService(t *testing.T) {
 				{LatestRevision: true, Tag: rollout.LatestTag},
 			},
 		},
-		// Candidate is unhealthy, rollback.
 		{
 			name: "unhealthy candidate, rollback",
 			traffic: []*run.TrafficTarget{
@@ -267,6 +259,7 @@ func TestUpdateService(t *testing.T) {
 			outAnnotations: map[string]string{
 				rollout.StableRevisionAnnotation:              "test-001",
 				rollout.CandidateRevisionAnnotation:           "test-002",
+				rollout.LastRolloutAnnotation:                 makeLastRolloutAnnotation(clockMock, 0),
 				rollout.LastFailedCandidateRevisionAnnotation: "test-002",
 				rollout.LastRolloutAnnotation:                 makeLastRolloutAnnotation(clockMock, 0),
 				rollout.LastHealthReportAnnotation: "status: unhealthy\n" +
@@ -280,7 +273,6 @@ func TestUpdateService(t *testing.T) {
 				{LatestRevision: true, Tag: rollout.LatestTag},
 			},
 		},
-		// Last ready revision is a previously failed candidate.
 		{
 			name: "latest ready is a failed candidate",
 			annotations: map[string]string{
@@ -293,7 +285,6 @@ func TestUpdateService(t *testing.T) {
 			lastReady:  "test-002",
 			nilService: true,
 		},
-		// Inconclusive diagnosis, do nothing.
 		{
 			name: "inconclusive diagnosis",
 			traffic: []*run.TrafficTarget{
