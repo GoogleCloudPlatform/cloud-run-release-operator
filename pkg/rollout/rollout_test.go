@@ -149,8 +149,8 @@ func TestUpdateService(t *testing.T) {
 			outAnnotations: map[string]string{
 				rollout.LastHealthReportAnnotation: "status: healthy\n" +
 					"metrics:" +
-					"\n- request-latency[p99]: 500.00 (threshold 750.00)" +
-					"\n- error-rate-percent: 1.00 (threshold 5.00)",
+					"\n- request-latency[p99]: 500.00 (needs 750.00)" +
+					"\n- error-rate-percent: 1.00 (needs 5.00)",
 				rollout.StableRevisionAnnotation:    "test-001",
 				rollout.CandidateRevisionAnnotation: "test-002",
 			},
@@ -195,8 +195,8 @@ func TestUpdateService(t *testing.T) {
 			outAnnotations: map[string]string{
 				rollout.LastHealthReportAnnotation: "status: healthy\n" +
 					"metrics:" +
-					"\n- request-latency[p99]: 500.00 (threshold 750.00)" +
-					"\n- error-rate-percent: 1.00 (threshold 5.00)",
+					"\n- request-latency[p99]: 500.00 (needs 750.00)" +
+					"\n- error-rate-percent: 1.00 (needs 5.00)",
 				rollout.StableRevisionAnnotation: "test-002",
 			},
 			outTraffic: []*run.TrafficTarget{
@@ -219,8 +219,8 @@ func TestUpdateService(t *testing.T) {
 			outAnnotations: map[string]string{
 				rollout.LastHealthReportAnnotation: "status: unhealthy\n" +
 					"metrics:" +
-					"\n- request-latency[p99]: 500.00 (threshold 100.00)" +
-					"\n- error-rate-percent: 1.00 (threshold 0.95)",
+					"\n- request-latency[p99]: 500.00 (needs 100.00)" +
+					"\n- error-rate-percent: 1.00 (needs 0.95)",
 				rollout.StableRevisionAnnotation:              "test-001",
 				rollout.CandidateRevisionAnnotation:           "test-002",
 				rollout.LastFailedCandidateRevisionAnnotation: "test-002",
