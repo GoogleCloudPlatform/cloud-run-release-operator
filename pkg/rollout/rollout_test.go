@@ -142,7 +142,7 @@ func TestUpdateService(t *testing.T) {
 			},
 		},
 		{
-			name: "keep rolling forward the same candidate",
+			name: "keep rolling out the same candidate",
 			traffic: []*run.TrafficTarget{
 				{RevisionName: "test-001", Percent: 100 - strategy.Steps[1], Tag: rollout.StableTag},
 				{RevisionName: "test-002", Percent: strategy.Steps[1], Tag: rollout.CandidateTag},
@@ -259,7 +259,6 @@ func TestUpdateService(t *testing.T) {
 			outAnnotations: map[string]string{
 				rollout.StableRevisionAnnotation:              "test-001",
 				rollout.CandidateRevisionAnnotation:           "test-002",
-				rollout.LastRolloutAnnotation:                 makeLastRolloutAnnotation(clockMock, 0),
 				rollout.LastFailedCandidateRevisionAnnotation: "test-002",
 				rollout.LastRolloutAnnotation:                 makeLastRolloutAnnotation(clockMock, 0),
 				rollout.LastHealthReportAnnotation: "status: unhealthy\n" +
