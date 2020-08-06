@@ -39,10 +39,10 @@ type Metric struct {
 
 // Strategy is the steps and configuration for rollout.
 type Strategy struct {
-	Steps                 []int64
-	HealthCriteria        []Metric
-	HealthOffsetMinute    int
-	TimeRollForwardMinute int
+	Steps                       []int64
+	HealthCriteria              []Metric
+	HealthOffsetMinute          int
+	TimeBetweenRollForwardsMins int
 }
 
 // Config contains the configuration for the application.
@@ -55,14 +55,14 @@ type Config struct {
 }
 
 // WithValues initializes a configuration with the given values.
-func WithValues(targets []*Target, steps []int64, healthOffset, timeForward int, metrics []Metric) *Config {
+func WithValues(targets []*Target, steps []int64, healthOffset, timeBetweenRollForwards int, metrics []Metric) *Config {
 	return &Config{
 		Targets: targets,
 		Strategy: &Strategy{
-			Steps:                 steps,
-			HealthCriteria:        metrics,
-			HealthOffsetMinute:    healthOffset,
-			TimeRollForwardMinute: timeForward,
+			Steps:                       steps,
+			HealthCriteria:              metrics,
+			HealthOffsetMinute:          healthOffset,
+			TimeBetweenRollForwardsMins: timeBetweenRollForwards,
 		},
 	}
 }

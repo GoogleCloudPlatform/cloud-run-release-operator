@@ -67,15 +67,15 @@ var (
 	flRegionsString string
 
 	// Rollout strategy-related flags.
-	flSteps                stepFlags
-	flStepsString          string
-	flHealthOffsetMinute   int
-	flMinForwardTimeMinute int
-	flMinRequestCount      int
-	flErrorRate            float64
-	flLatencyP99           float64
-	flLatencyP95           float64
-	flLatencyP50           float64
+	flSteps                  stepFlags
+	flStepsString            string
+	flHealthOffsetMinute     int
+	flTimeBeweenRollForwards int
+	flMinRequestCount        int
+	flErrorRate              float64
+	flLatencyP99             float64
+	flLatencyP95             float64
+	flLatencyP50             float64
 
 	// Metrics provider flags.
 	flGoogleSheetsID string
@@ -97,7 +97,7 @@ func init() {
 	flag.Var(&flSteps, "step", "a percentage in traffic the candidate should go through")
 	flag.StringVar(&flStepsString, "steps", "5,20,50,80", "define steps in one flag separated by commas (e.g. 5,30,60)")
 	flag.IntVar(&flHealthOffsetMinute, "healthcheck-offset", 30, "use metrics from the last N minutes relative to current rollout process")
-	flag.IntVar(&flMinForwardTimeMinute, "min-forward-time", 30, "the minimum time needed to roll the candidate forward (in minutes)")
+	flag.IntVar(&flTimeBeweenRollForwards, "min-wait", 30, "minimum time to wait between rollout stages (in minutes), use 0 to disable")
 	flag.IntVar(&flMinRequestCount, "min-requests", 0, "expected minimum requests before determining candidate's health")
 	flag.Float64Var(&flErrorRate, "max-error-rate", 1.0, "expected max server error rate (in percent)")
 	flag.Float64Var(&flLatencyP99, "latency-p99", 0, "expected max latency for 99th percentile of requests (set 0 to ignore)")
@@ -138,7 +138,7 @@ func main() {
 	target := config.NewTarget(flProject, flRegions, flLabelSelector)
 	healthCriteria := healthCriteriaFromFlags(flMinRequestCount, flErrorRate, flLatencyP99, flLatencyP95, flLatencyP50)
 	printHealthCriteria(logger, healthCriteria)
-	cfg := config.WithValues([]*config.Target{target}, flSteps, flHealthOffsetMinute, flMinForwardTimeMinute, healthCriteria)
+	cfg := config.WithValues([]*config.Target{target}, flSteps, flHealthOffsetMinute, flTimeBeweenRollForwards, healthCriteria)
 	if err := cfg.Validate(flCLI); err != nil {
 		logger.Fatalf("invalid rollout configuration: %v", err)
 	}
