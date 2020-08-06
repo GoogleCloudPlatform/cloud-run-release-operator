@@ -20,6 +20,8 @@ error rate of 1%.
 
 ## How does it work?
 
+![Rollout stages](assets/rollout-stages.svg "Rollout stages from v1 to v2")
+
 The Cloud Run Progressive Delivery Operator periodically checks for new
 revisions in the services that opted-in for gradual rollouts. If a new revision
 with no traffic is found, the operator automatically assigns it some initial
