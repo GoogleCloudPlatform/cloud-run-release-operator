@@ -343,7 +343,6 @@ func (r *Rollout) updateAnnotations(svc *run.Service, stable, candidate string) 
 	if r.promoteToStable {
 		setAnnotation(svc, StableRevisionAnnotation, candidate)
 		delete(svc.Metadata.Annotations, CandidateRevisionAnnotation)
-		svc.Metadata.Annotations[LastRolloutAnnotation] = now
 		return svc
 	}
 
