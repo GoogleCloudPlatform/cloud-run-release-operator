@@ -122,7 +122,12 @@ func (r *Rollout) UpdateService(svc *run.Service) (*run.Service, error) {
 	if isNewCandidate(svc, candidate) {
 		r.log.Debug("new candidate, assign some traffic")
 		svc = r.PrepareRollForward(svc, stable, candidate)
-		svc = r.updateAnnotations(svc, stable, candidate, "new candidate, no health report available yet")
+		svc = r.updateAnnotations(svc, stable, candidate)
+
+		// TODO(gvso): create a setHealthReportAnnotation that appends the
+		// current time to the report before setting the annotation.
+		setAnnotation(svc, LastHealthReportAnnotation, "new candidate, no health report available yet")
+
 		err := r.replaceService(svc)
 		return svc, errors.Wrap(err, "failed to replace service")
 	}
@@ -148,8 +153,10 @@ func (r *Rollout) UpdateService(svc *run.Service) (*run.Service, error) {
 		return nil, errors.Errorf("invalid candidate's health diagnosis %v", diagnosis.OverallResult)
 	}
 
+	svc = r.updateAnnotations(svc, stable, candidate)
 	report := health.StringReport(r.strategy.HealthCriteria, diagnosis)
-	svc = r.updateAnnotations(svc, stable, candidate, report)
+	setAnnotation(svc, LastHealthReportAnnotation, report)
+
 	err = r.replaceService(svc)
 	return svc, errors.Wrap(err, "failed to replace service")
 }
@@ -286,26 +293,29 @@ func (r *Rollout) nextCandidateTraffic(current int64) int64 {
 }
 
 // updateAnnotations updates the annotations to keep some state about the rollout.
-func (r *Rollout) updateAnnotations(svc *run.Service, stable, candidate, healthReport string) *run.Service {
-	if svc.Metadata.Annotations == nil {
-		svc.Metadata.Annotations = make(map[string]string)
-	}
-	svc.Metadata.Annotations[LastHealthReportAnnotation] = healthReport
-
+func (r *Rollout) updateAnnotations(svc *run.Service, stable, candidate string) *run.Service {
 	// The candidate has become the stable revision.
 	if r.promoteToStable {
-		svc.Metadata.Annotations[StableRevisionAnnotation] = candidate
+		setAnnotation(svc, StableRevisionAnnotation, candidate)
 		delete(svc.Metadata.Annotations, CandidateRevisionAnnotation)
 		return svc
 	}
 
-	svc.Metadata.Annotations[StableRevisionAnnotation] = stable
-	svc.Metadata.Annotations[CandidateRevisionAnnotation] = candidate
+	setAnnotation(svc, StableRevisionAnnotation, stable)
+	setAnnotation(svc, CandidateRevisionAnnotation, candidate)
 	if r.shouldRollback {
-		svc.Metadata.Annotations[LastFailedCandidateRevisionAnnotation] = candidate
+		setAnnotation(svc, LastFailedCandidateRevisionAnnotation, candidate)
 	}
 
 	return svc
+}
+
+// setAnnotation sets the value of an annotation.
+func setAnnotation(svc *run.Service, key, value string) {
+	if svc.Metadata.Annotations == nil {
+		svc.Metadata.Annotations = make(map[string]string)
+	}
+	svc.Metadata.Annotations[key] = value
 }
 
 // diagnoseCandidate returns the candidate's diagnosis based on metrics.

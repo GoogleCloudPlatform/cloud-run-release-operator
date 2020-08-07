@@ -7,12 +7,6 @@ import (
 )
 
 // StringReport returns a human-readable report of the diagnosis.
-//
-// The returned string has the format:
-// status: healthy
-// metrics:
-// - request-latency[p99]: 500.00 (needs 750.0)
-// - request-count: 800 (needs 1000)
 func StringReport(healthCriteria []config.Metric, diagnosis Diagnosis) string {
 	report := fmt.Sprintf("status: %s\n", diagnosis.OverallResult.String())
 	report += "metrics:"
