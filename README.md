@@ -190,8 +190,9 @@ The rollout strategy consists of the steps and health criteria.
 
 - `-cli-run-interval`: The time between each health check (default: `60s`). This
 is only need it if running with `-cli` option.
-- `-healthcheck-offset`:range of time for retrieving metrics relative to current
-rollout process (default: `30m`)
+- `-healthcheck-offset`: The range of time for retrieving metrics relative to
+the current rollout process (default: `30m`). Default value means that metrics
+from the last 30 minutes are retrieved.
 - `-min-requests`: The minimum number of requests needed to determine the
 candidate's health (default: `100`)
 - `-min-wait`: The minimum time before rolling out further (default: `30m`)
