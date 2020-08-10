@@ -187,9 +187,6 @@ func validateFlags() error {
 		}
 	}
 
-	if flHealthOffset < 0 {
-		return errors.Errorf("health check offset cannot be negative, got %s", flHealthOffset)
-	}
 	if flCLILoopInterval < 0 {
 		return errors.Errorf("cli run interval cannot be negative, got %s", flCLILoopInterval)
 	}
