@@ -95,6 +95,7 @@ The rollout strategy consists of the steps and health criteria.
 `60`). This is only need it if running with `-cli` option.
 - `-healthcheck-offset`: To evaluate the candidate's health, use metrics from
 the last `N` minutes relative to current rollout process (default: `30`)
+- `-min-wait`: The minimum time to wait between rollout stages (default: `30m`)
 - `-steps`: Percentages of traffic the candidate should go through (default:
 `5,20,50,80`)
 - `-max-error-rate`: Expected maximum rate (in percent) of server errors
