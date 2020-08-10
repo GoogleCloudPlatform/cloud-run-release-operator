@@ -45,6 +45,11 @@ func makeLastRolloutAnnotation(clock clockwork.Clock, offsetFromNowMinute int) s
 	return clock.Now().Add(offset).Format(time.RFC3339)
 }
 
+func addLastUpdateToReport(clock clockwork.Clock, report string) string {
+	report += fmt.Sprintf("\nlastUpdate: %s", clock.Now().Format(time.RFC3339))
+	return report
+}
+
 func TestUpdateService(t *testing.T) {
 	runclient := &runMocker.RunAPI{}
 	clockMock := clockwork.NewFakeClock()
@@ -64,8 +69,6 @@ func TestUpdateService(t *testing.T) {
 		HealthOffsetMinute:  5,
 		TimeBetweenRollouts: 10 * time.Minute,
 	}
-
-	fmt.Println(clockMock.Now().Add(-1 * 30 * time.Minute))
 
 	var tests = []struct {
 		name        string
@@ -97,7 +100,7 @@ func TestUpdateService(t *testing.T) {
 				rollout.StableRevisionAnnotation:    "test-002",
 				rollout.CandidateRevisionAnnotation: "test-003",
 				rollout.LastRolloutAnnotation:       clockMock.Now().Format(time.RFC3339),
-				rollout.LastHealthReportAnnotation:  "new candidate, no health report available yet",
+				rollout.LastHealthReportAnnotation:  addLastUpdateToReport(clockMock, "new candidate, no health report available yet"),
 			},
 			outTraffic: []*run.TrafficTarget{
 				{RevisionName: "test-002", Percent: 100 - strategy.Steps[0], Tag: rollout.StableTag},
@@ -133,7 +136,7 @@ func TestUpdateService(t *testing.T) {
 				rollout.StableRevisionAnnotation:    "test-001",
 				rollout.CandidateRevisionAnnotation: "test-002",
 				rollout.LastRolloutAnnotation:       makeLastRolloutAnnotation(clockMock, 0),
-				rollout.LastHealthReportAnnotation:  "new candidate, no health report available yet",
+				rollout.LastHealthReportAnnotation:  addLastUpdateToReport(clockMock, "new candidate, no health report available yet"),
 			},
 			outTraffic: []*run.TrafficTarget{
 				{RevisionName: "test-001", Percent: 100 - strategy.Steps[0], Tag: rollout.StableTag},
@@ -160,10 +163,11 @@ func TestUpdateService(t *testing.T) {
 				rollout.StableRevisionAnnotation:    "test-001",
 				rollout.CandidateRevisionAnnotation: "test-002",
 				rollout.LastRolloutAnnotation:       makeLastRolloutAnnotation(clockMock, 0),
-				rollout.LastHealthReportAnnotation: "status: healthy\n" +
-					"metrics:" +
-					"\n- request-latency[p99]: 500.00 (needs 750.00)" +
-					"\n- error-rate-percent: 1.00 (needs 5.00)",
+				rollout.LastHealthReportAnnotation: addLastUpdateToReport(clockMock,
+					"status: healthy\n"+
+						"metrics:"+
+						"\n- request-latency[p99]: 500.00 (needs 750.00)"+
+						"\n- error-rate-percent: 1.00 (needs 5.00)"),
 			},
 			outTraffic: []*run.TrafficTarget{
 				{RevisionName: "test-001", Percent: 100 - strategy.Steps[2], Tag: rollout.StableTag},
@@ -210,7 +214,7 @@ func TestUpdateService(t *testing.T) {
 				rollout.StableRevisionAnnotation:    "test-001",
 				rollout.CandidateRevisionAnnotation: "test-003",
 				rollout.LastRolloutAnnotation:       makeLastRolloutAnnotation(clockMock, 0),
-				rollout.LastHealthReportAnnotation:  "new candidate, no health report available yet",
+				rollout.LastHealthReportAnnotation:  addLastUpdateToReport(clockMock, "new candidate, no health report available yet"),
 			},
 			outTraffic: []*run.TrafficTarget{
 				{RevisionName: "test-001", Percent: 100 - strategy.Steps[0], Tag: rollout.StableTag},
@@ -235,10 +239,11 @@ func TestUpdateService(t *testing.T) {
 			outAnnotations: map[string]string{
 				rollout.StableRevisionAnnotation: "test-002",
 				rollout.LastRolloutAnnotation:    makeLastRolloutAnnotation(clockMock, 0),
-				rollout.LastHealthReportAnnotation: "status: healthy\n" +
-					"metrics:" +
-					"\n- request-latency[p99]: 500.00 (needs 750.00)" +
-					"\n- error-rate-percent: 1.00 (needs 5.00)",
+				rollout.LastHealthReportAnnotation: addLastUpdateToReport(clockMock,
+					"status: healthy\n"+
+						"metrics:"+
+						"\n- request-latency[p99]: 500.00 (needs 750.00)"+
+						"\n- error-rate-percent: 1.00 (needs 5.00)"),
 			},
 			outTraffic: []*run.TrafficTarget{
 				{RevisionName: "test-002", Percent: 100, Tag: rollout.StableTag},
@@ -261,10 +266,11 @@ func TestUpdateService(t *testing.T) {
 				rollout.CandidateRevisionAnnotation:           "test-002",
 				rollout.LastFailedCandidateRevisionAnnotation: "test-002",
 				rollout.LastRolloutAnnotation:                 makeLastRolloutAnnotation(clockMock, 0),
-				rollout.LastHealthReportAnnotation: "status: unhealthy\n" +
-					"metrics:" +
-					"\n- request-latency[p99]: 500.00 (needs 100.00)" +
-					"\n- error-rate-percent: 1.00 (needs 0.95)",
+				rollout.LastHealthReportAnnotation: addLastUpdateToReport(clockMock,
+					"status: unhealthy\n"+
+						"metrics:"+
+						"\n- request-latency[p99]: 500.00 (needs 100.00)"+
+						"\n- error-rate-percent: 1.00 (needs 0.95)"),
 			},
 			outTraffic: []*run.TrafficTarget{
 				{RevisionName: "test-001", Percent: 100, Tag: rollout.StableTag},
@@ -297,7 +303,6 @@ func TestUpdateService(t *testing.T) {
 			},
 			nilService: true,
 		},
-		// Unknown diagnosis, should err.
 		{
 			name: "unknown diagnosis",
 			traffic: []*run.TrafficTarget{
