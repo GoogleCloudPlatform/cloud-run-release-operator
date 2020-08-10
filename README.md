@@ -37,14 +37,15 @@ or traffic to the candidate is dropped and is redirected to the `stable` revisio
 #### Rollout with no issues
 
 1. I have version **v1** of an application deployed to Cloud Run
-2. I run the Cloud Run Progressive Delivery Operator
-3. I assign the label `rollout-strategy=gradual` to the Cloud Run service
-4. I deploy a new version, **v2**, to Cloud Run with `--no-traffic` option (gets
+2. I deploy a new version, **v2**, to Cloud Run with `--no-traffic` option (gets
 0% of the traffic)
-5. The new version is automatically detected and assigned 5% of the traffic
-6. Every minute, metrics for **v2** in the last 30 minutes are retrieved
-7. Metrics show a "healthy" version and traffic to **v2** is increased to 30%
-8. The process is repeated until the new version handles all the traffic and
+3. The new version is automatically detected and assigned 5% of the traffic
+4. Every minute, metrics for **v2** in the last 30 minutes are retrieved.
+Metrics show a "healthy" version and traffic to **v2** is increased to 30% only
+after 30 minutes have passed since last update
+5. Metrics show a "healthy" version again and traffic to **v2** is increased to
+50% only after 30 minutes have passed since last update
+6. The process is repeated until the new version handles all the traffic and
 becomes `stable`
 
 ![Rollout stages](assets/rollout-stages.svg "Rollout stages from v1 to v2")
@@ -52,16 +53,15 @@ becomes `stable`
 #### Rollback
 
 1. I have version **v1** of an application deployed to Cloud Run
-2. I run the Cloud Run Progressive Delivery Operator
-3. I assign the label `rollout-strategy=gradual` to the Cloud Run service
-4. I deploy a new version, **v2**, to Cloud Run with `--no-traffic` option (gets
+2. I deploy a new version, **v2**, to Cloud Run with `--no-traffic` option (gets
 0% of the traffic)
-5. The new version is automatically detected and assigned 5% of the traffic
-6. Every minute, metrics for **v2** in the last 30 minutes are retrieved
-7. Metrics show a "healthy" version and traffic to **v2** is increased to 30%
-8. Metrics for **v2** are retrieved one more time
-9. Metrics show an "unhealthy" version and traffic to **v2** is dropped. All
-traffic is redirected to **v1**
+3. The new version is automatically detected and assigned 5% of the traffic
+4. Every minute, metrics for **v2** in the last 30 minutes are retrieved.
+Metrics show a "healthy" version and traffic to **v2** is increased to 30% only
+after 30 minutes have passed since last update
+5. Metrics for **v2** are retrieved one more time and show an "unhealthy"
+version. Traffic to **v2** is inmediately dropped, and all traffic is redirected
+to **v1**
 
 ![Rollout stages](assets/rollback-stages.svg "Rollout stages from v1 to v2")
 
