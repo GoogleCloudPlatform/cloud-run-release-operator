@@ -7,7 +7,9 @@ to the previous one.
 
 ## Usage
 
-`cloud_run_release_operator -cli -project=<YOUR_PROJECT>`
+```shell
+cloud_run_release_operator -cli -project=<YOUR_PROJECT>
+```
 
 Once you run this command, it will check the health of Cloud Run services with
 the label `rollout-strategy=gradual` every minute by looking at the candidate's
@@ -20,8 +22,6 @@ metrics for the past 30 minutes by default.
 - If metrics show an unhealthy candidate, a roll back is performed
 
 ## How does it work?
-
-![Rollout stages](assets/rollout-stages.svg "Rollout stages from v1 to v2")
 
 The Cloud Run Progressive Delivery Operator periodically checks for new
 revisions in the services that opted-in for gradual rollouts. If a new revision
@@ -43,9 +43,11 @@ or traffic to the candidate is dropped and is redirected to the `stable` revisio
 0% of the traffic)
 5. The new version is automatically detected and assigned 5% of the traffic
 6. Every minute, metrics for **v2** in the last 30 minutes are retrieved
-7. Metrics show a "healthy" version and traffic to **v2** is increased to 20%
+7. Metrics show a "healthy" version and traffic to **v2** is increased to 30%
 8. The process is repeated until the new version handles all the traffic and
 becomes `stable`
+
+![Rollout stages](assets/rollout-stages.svg "Rollout stages from v1 to v2")
 
 #### Rollback
 
@@ -56,10 +58,12 @@ becomes `stable`
 0% of the traffic)
 5. The new version is automatically detected and assigned 5% of the traffic
 6. Every minute, metrics for **v2** in the last 30 minutes are retrieved
-7. Metrics show a "healthy" version and traffic to **v2** is increased to 20%
+7. Metrics show a "healthy" version and traffic to **v2** is increased to 30%
 8. Metrics for **v2** are retrieved one more time
 9. Metrics show an "unhealthy" version and traffic to **v2** is dropped. All
 traffic is redirected to **v1**
+
+![Rollout stages](assets/rollback-stages.svg "Rollout stages from v1 to v2")
 
 ## Configuration
 
