@@ -193,7 +193,8 @@ is only need it if running with `-cli` option.
 - `-healthcheck-offset`: Time window to look back during health check to assess
 the candidate revision's health (default: `30m`).
 - `-min-requests`: The minimum number of requests needed to determine the
-candidate's health (default: `100`)
+candidate's health (default: `100`). This minimum value is expected in the time
+window determined by `-healthcheck-offset`
 - `-min-wait`: The minimum time before rolling out further (default: `30m`)
 - `-steps`: Percentages of traffic the candidate should go through (default:
 `5,20,50,80`)
