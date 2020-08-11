@@ -1,4 +1,4 @@
-package rollout_test
+package rollout
 
 import (
 	"context"
@@ -7,7 +7,6 @@ import (
 	metricsmock "github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/metrics/mock"
 	runmock "github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/run/mock"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/config"
-	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/rollout"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/api/run/v1"
 )
@@ -33,14 +32,14 @@ func TestRollForwardTraffic(t *testing.T) {
 			traffic: []*run.TrafficTarget{
 				{RevisionName: "test-001", Percent: 50},
 				{RevisionName: "test-001", Tag: "tag1"},
-				{RevisionName: "test-002", Percent: 50, Tag: rollout.CandidateTag},
+				{RevisionName: "test-002", Percent: 50, Tag: CandidateTag},
 				{RevisionName: "test-002", Tag: "tag2"},
-				{LatestRevision: true, Tag: rollout.LatestTag},
+				{LatestRevision: true, Tag: LatestTag},
 			},
 			expected: []*run.TrafficTarget{
-				{RevisionName: "test-001", Percent: 95, Tag: rollout.StableTag},
-				{RevisionName: "test-003", Percent: 5, Tag: rollout.CandidateTag},
-				{LatestRevision: true, Tag: rollout.LatestTag},
+				{RevisionName: "test-001", Percent: 95, Tag: StableTag},
+				{RevisionName: "test-003", Percent: 5, Tag: CandidateTag},
+				{LatestRevision: true, Tag: LatestTag},
 				{RevisionName: "test-001", Tag: "tag1"},
 				{RevisionName: "test-002", Tag: "tag2"},
 			},
@@ -50,16 +49,16 @@ func TestRollForwardTraffic(t *testing.T) {
 			stable:    "test-001",
 			candidate: "test-003",
 			traffic: []*run.TrafficTarget{
-				{RevisionName: "test-001", Percent: 70, Tag: rollout.StableTag},
+				{RevisionName: "test-001", Percent: 70, Tag: StableTag},
 				{RevisionName: "test-002", Tag: "tag1"},
-				{RevisionName: "test-003", Percent: 30, Tag: rollout.CandidateTag},
+				{RevisionName: "test-003", Percent: 30, Tag: CandidateTag},
 				{RevisionName: "test-003", Tag: "tag2"},
-				{LatestRevision: true, Tag: rollout.LatestTag},
+				{LatestRevision: true, Tag: LatestTag},
 			},
 			expected: []*run.TrafficTarget{
-				{RevisionName: "test-001", Percent: 40, Tag: rollout.StableTag},
-				{RevisionName: "test-003", Percent: 60, Tag: rollout.CandidateTag},
-				{LatestRevision: true, Tag: rollout.LatestTag},
+				{RevisionName: "test-001", Percent: 40, Tag: StableTag},
+				{RevisionName: "test-003", Percent: 60, Tag: CandidateTag},
+				{LatestRevision: true, Tag: LatestTag},
 				{RevisionName: "test-002", Tag: "tag1"},
 				{RevisionName: "test-003", Tag: "tag2"},
 			},
@@ -69,15 +68,15 @@ func TestRollForwardTraffic(t *testing.T) {
 			stable:    "test-001",
 			candidate: "test-003",
 			traffic: []*run.TrafficTarget{
-				{RevisionName: "test-001", Percent: 40, Tag: rollout.StableTag},
+				{RevisionName: "test-001", Percent: 40, Tag: StableTag},
 				{RevisionName: "test-002", Tag: "tag1"},
-				{RevisionName: "test-003", Percent: 60, Tag: rollout.CandidateTag},
+				{RevisionName: "test-003", Percent: 60, Tag: CandidateTag},
 				{RevisionName: "test-003", Tag: "tag2"},
 			},
 			expected: []*run.TrafficTarget{
-				{RevisionName: "test-001", Percent: 0, Tag: rollout.StableTag},
-				{RevisionName: "test-003", Percent: 100, Tag: rollout.CandidateTag},
-				{LatestRevision: true, Tag: rollout.LatestTag},
+				{RevisionName: "test-001", Percent: 0, Tag: StableTag},
+				{RevisionName: "test-003", Percent: 100, Tag: CandidateTag},
+				{LatestRevision: true, Tag: LatestTag},
 				{RevisionName: "test-002", Tag: "tag1"},
 				{RevisionName: "test-003", Tag: "tag2"},
 			},
@@ -87,15 +86,15 @@ func TestRollForwardTraffic(t *testing.T) {
 			stable:    "test-001",
 			candidate: "test-003",
 			traffic: []*run.TrafficTarget{
-				{RevisionName: "test-001", Percent: 0, Tag: rollout.StableTag},
+				{RevisionName: "test-001", Percent: 0, Tag: StableTag},
 				{RevisionName: "test-002", Tag: "tag1"},
-				{RevisionName: "test-003", Percent: 100, Tag: rollout.CandidateTag},
+				{RevisionName: "test-003", Percent: 100, Tag: CandidateTag},
 				{RevisionName: "test-003", Tag: "tag2"},
-				{LatestRevision: true, Tag: rollout.LatestTag},
+				{LatestRevision: true, Tag: LatestTag},
 			},
 			expected: []*run.TrafficTarget{
-				{RevisionName: "test-003", Percent: 100, Tag: rollout.StableTag},
-				{LatestRevision: true, Tag: rollout.LatestTag},
+				{RevisionName: "test-003", Percent: 100, Tag: StableTag},
+				{LatestRevision: true, Tag: LatestTag},
 				{RevisionName: "test-002", Tag: "tag1"},
 				{RevisionName: "test-003", Tag: "tag2"},
 			},
@@ -106,32 +105,34 @@ func TestRollForwardTraffic(t *testing.T) {
 			candidate: "test-003",
 			traffic: []*run.TrafficTarget{
 				{RevisionName: "test-001", Percent: 70},
-				{RevisionName: "test-001", Tag: rollout.StableTag},
+				{RevisionName: "test-001", Tag: StableTag},
 				{RevisionName: "test-002", Tag: "tag1"},
 				{RevisionName: "test-003", Percent: 30},
-				{RevisionName: "test-003", Tag: rollout.CandidateTag},
-				{LatestRevision: true, Tag: rollout.LatestTag},
+				{RevisionName: "test-003", Tag: CandidateTag},
+				{LatestRevision: true, Tag: LatestTag},
 			},
 			expected: []*run.TrafficTarget{
-				{RevisionName: "test-001", Percent: 40, Tag: rollout.StableTag},
-				{RevisionName: "test-003", Percent: 60, Tag: rollout.CandidateTag},
-				{LatestRevision: true, Tag: rollout.LatestTag},
+				{RevisionName: "test-001", Percent: 40, Tag: StableTag},
+				{RevisionName: "test-003", Percent: 60, Tag: CandidateTag},
+				{LatestRevision: true, Tag: LatestTag},
 				{RevisionName: "test-002", Tag: "tag1"},
 			},
 		},
 	}
 
 	for _, test := range tests {
-		opts := &ServiceOpts{
-			Traffic: test.traffic,
+		svc := &run.Service{
+			Metadata: &run.ObjectMeta{},
+			Spec: &run.ServiceSpec{
+				Traffic: test.traffic,
+			},
 		}
-		svc := generateService(opts)
-		svcRecord := &rollout.ServiceRecord{Service: svc}
+		svcRecord := &ServiceRecord{Service: svc}
 
-		r := rollout.New(context.TODO(), metricsMock, svcRecord, strategy).WithClient(runclient)
+		r := New(context.TODO(), metricsMock, svcRecord, strategy).WithClient(runclient)
 
 		t.Run(test.name, func(tt *testing.T) {
-			traffic := r.RollForwardTraffic(svc.Spec.Traffic, test.stable, test.candidate)
+			traffic := r.rollForwardTraffic(svc.Spec.Traffic, test.stable, test.candidate)
 			assert.Equal(tt, test.expected, traffic)
 		})
 	}
@@ -143,22 +144,27 @@ func TestRollbackTraffic(t *testing.T) {
 	stable := "test-001"
 	candidate := "test-003"
 	traffic := []*run.TrafficTarget{
-		{RevisionName: "test-001", Percent: 40, Tag: rollout.StableTag},
+		{RevisionName: "test-001", Percent: 40, Tag: StableTag},
 		{RevisionName: "test-002", Tag: "tag1"},
-		{RevisionName: "test-003", Percent: 60, Tag: rollout.CandidateTag},
+		{RevisionName: "test-003", Percent: 60, Tag: CandidateTag},
 		{RevisionName: "test-003", Tag: "tag2"},
 	}
 	expectedTraffic := []*run.TrafficTarget{
-		{RevisionName: "test-001", Percent: 100, Tag: rollout.StableTag},
-		{RevisionName: "test-003", Percent: 0, Tag: rollout.CandidateTag},
-		{LatestRevision: true, Tag: rollout.LatestTag},
+		{RevisionName: "test-001", Percent: 100, Tag: StableTag},
+		{RevisionName: "test-003", Percent: 0, Tag: CandidateTag},
+		{LatestRevision: true, Tag: LatestTag},
 		{RevisionName: "test-002", Tag: "tag1"},
 		{RevisionName: "test-003", Tag: "tag2"},
 	}
-	svc := generateService(&ServiceOpts{Traffic: traffic})
-	svcRecord := &rollout.ServiceRecord{Service: svc}
+	svc := &run.Service{
+		Metadata: &run.ObjectMeta{},
+		Spec: &run.ServiceSpec{
+			Traffic: traffic,
+		},
+	}
+	svcRecord := &ServiceRecord{Service: svc}
 
-	r := rollout.New(context.TODO(), metricsMock, svcRecord, config.Strategy{})
-	traffic = r.RollbackTraffic(svc.Spec.Traffic, stable, candidate)
+	r := New(context.TODO(), metricsMock, svcRecord, config.Strategy{})
+	traffic = r.rollbackTraffic(svc.Spec.Traffic, stable, candidate)
 	assert.Equal(t, expectedTraffic, traffic)
 }

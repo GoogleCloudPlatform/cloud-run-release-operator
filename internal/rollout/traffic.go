@@ -9,10 +9,9 @@ import (
 	"google.golang.org/api/run/v1"
 )
 
-// trafficBasedOnDiagnosis updates a service's traffic configuration
-// based on the diagnosis.
+// determineTraffic returns a traffic configuration based on the diagnosis.
 // If traffic should not changed, nil is returned.
-func (r *Rollout) trafficBasedOnDiagnosis(svc *run.Service, diagnosis health.DiagnosisResult, stable, candidate string) ([]*run.TrafficTarget, error) {
+func (r *Rollout) determineTraffic(svc *run.Service, diagnosis health.DiagnosisResult, stable, candidate string) ([]*run.TrafficTarget, error) {
 	switch diagnosis {
 	case health.Inconclusive:
 		r.log.Debug("health check inconclusive")
@@ -22,29 +21,29 @@ func (r *Rollout) trafficBasedOnDiagnosis(svc *run.Service, diagnosis health.Dia
 		lastRollout := svc.Metadata.Annotations[LastRolloutAnnotation]
 		enoughTime, err := r.hasEnoughTimeElapsed(lastRollout, r.strategy.TimeBetweenRollouts)
 		if err != nil {
-			return nil, errors.Wrap(err, "could not determine if roll out is allowed")
+			return nil, errors.Wrap(err, "error while determining if enough time elapsed")
 		}
 		if !enoughTime {
 			r.log.WithField("lastRollout", lastRollout).Debug("no enough time elapsed since last roll out")
 			return nil, nil
 		}
 		r.log.Debug("rolling forward")
-		return r.RollForwardTraffic(svc.Spec.Traffic, stable, candidate), nil
+		return r.rollForwardTraffic(svc.Spec.Traffic, stable, candidate), nil
 	case health.Unhealthy:
 		r.log.Info("unhealthy candidate, rollback")
 		r.shouldRollback = true
-		return r.RollbackTraffic(svc.Spec.Traffic, stable, candidate), nil
+		return r.rollbackTraffic(svc.Spec.Traffic, stable, candidate), nil
 	default:
 		return nil, errors.Errorf("invalid candidate's health diagnosis %v", diagnosis)
 	}
 }
 
-// RollForwardTraffic updates the traffic configuration to increase the traffic
+// rollForwardTraffic updates the traffic configuration to increase the traffic
 // to the candidate.
 //
 // It creates new traffic configurations for the candidate and stable revisions
 // and respects user-defined revision tags.
-func (r *Rollout) RollForwardTraffic(traffic []*run.TrafficTarget, stable, candidate string) []*run.TrafficTarget {
+func (r *Rollout) rollForwardTraffic(traffic []*run.TrafficTarget, stable, candidate string) []*run.TrafficTarget {
 	r.log.Debug("splitting traffic")
 
 	var newTraffic []*run.TrafficTarget
@@ -76,8 +75,8 @@ func (r *Rollout) RollForwardTraffic(traffic []*run.TrafficTarget, stable, candi
 	return newTraffic
 }
 
-// RollbackTraffic redirects all the traffic to the stable revision.
-func (r *Rollout) RollbackTraffic(traffic []*run.TrafficTarget, stable, candidate string) []*run.TrafficTarget {
+// rollbackTraffic redirects all the traffic to the stable revision.
+func (r *Rollout) rollbackTraffic(traffic []*run.TrafficTarget, stable, candidate string) []*run.TrafficTarget {
 	newTraffic := []*run.TrafficTarget{
 		newTrafficTarget(stable, 100, StableTag),
 		newTrafficTarget(candidate, 0, CandidateTag),

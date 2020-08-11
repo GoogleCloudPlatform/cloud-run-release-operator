@@ -2,6 +2,7 @@ package rollout_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 

@@ -132,7 +132,7 @@ func (r *Rollout) UpdateService(svc *run.Service) (*run.Service, error) {
 	// A new candidate does not have metrics yet, so it can't be diagnosed.
 	if isNewCandidate(svc, candidate) {
 		r.log.Debug("new candidate, assign some traffic")
-		svc.Spec.Traffic = r.RollForwardTraffic(svc.Spec.Traffic, stable, candidate)
+		svc.Spec.Traffic = r.rollForwardTraffic(svc.Spec.Traffic, stable, candidate)
 		svc = r.updateAnnotations(svc, stable, candidate)
 		r.setHealthReportAnnotation(svc, "new candidate, no health report available yet")
 
@@ -146,7 +146,7 @@ func (r *Rollout) UpdateService(svc *run.Service) (*run.Service, error) {
 		return nil, errors.Wrapf(err, "failed to diagnose health for candidate %q", candidate)
 	}
 
-	traffic, err := r.trafficBasedOnDiagnosis(svc, diagnosis.OverallResult, stable, candidate)
+	traffic, err := r.determineTraffic(svc, diagnosis.OverallResult, stable, candidate)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to configure traffic after diagnosis")
 	}
