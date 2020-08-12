@@ -8,16 +8,9 @@ import (
 
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/config"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/metrics"
-<<<<<<< HEAD:internal/rollout/rollout_test.go
-	metricsMocker "github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/metrics/mock"
-	"github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/rollout"
-	runMocker "github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/run/mock"
-=======
 	metricsmock "github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/metrics/mock"
+	"github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/rollout"
 	runmock "github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/run/mock"
-	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/config"
-	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/rollout"
->>>>>>> rollout: Update traffic in UpdateService:pkg/rollout/rollout_test.go
 	"github.com/jonboulle/clockwork"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"

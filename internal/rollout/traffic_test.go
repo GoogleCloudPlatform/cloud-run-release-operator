@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
+	"github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/config"
 	metricsmock "github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/metrics/mock"
 	runmock "github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/run/mock"
-	"github.com/GoogleCloudPlatform/cloud-run-release-operator/pkg/config"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/api/run/v1"
 )
