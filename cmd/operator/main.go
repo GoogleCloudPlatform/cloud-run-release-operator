@@ -142,8 +142,7 @@ func main() {
 		}
 	}
 
-	valid, err := flagsAreValid()
-	if !valid {
+	if err := validateFlags(); err != nil {
 		logger.Fatalf("invalid flags: %v", err)
 	}
 
@@ -264,10 +263,8 @@ func determineProjectID() (string, error) {
 
 	// Try to get project ID by retrieving default value in gcloud.
 	cmd := exec.Command("gcloud", "config", "get-value", "core/project", "-q")
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	err := cmd.Run()
 	if err != nil {
 		msg := "error when running gcloud command to get default project"
