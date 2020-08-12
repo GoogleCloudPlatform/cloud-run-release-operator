@@ -15,15 +15,18 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"flag"
 	"fmt"
 	"net/http"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 	"time"
 
+	"cloud.google.com/go/compute/metadata"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/config"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/metrics"
 	"github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/metrics/sheets"
@@ -129,7 +132,18 @@ func main() {
 		)
 	}
 
-	if err := validateFlags(); err != nil {
+	if flProject == "" {
+		logger.Info("-project not specified, trying to autodetect one")
+		flProject, err = determineDefaultProject()
+		if err != nil {
+			logger.Fatalf("failed to detect project, must specify one with -project: %v", err)
+		} else {
+			logger.Infof("project detected: %s", flProject)
+		}
+	}
+
+	valid, err := flagsAreValid()
+	if !valid {
 		logger.Fatalf("invalid flags: %v", err)
 	}
 
@@ -237,4 +251,29 @@ func printHealthCriteria(logger *logrus.Logger, healthCriteria []config.HealthCr
 		}
 		lg.Debug("found health criterion")
 	}
+}
+
+func determineDefaultProject() (string, error) {
+	if metadata.OnGCE() {
+		v, err := metadata.ProjectID()
+		if err != nil {
+			return "", errors.Wrapf(err, "error when getting project ID from compute metadata: %v", err)
+		}
+		return v, nil
+	}
+
+	// Try to get project ID by retrieving default value in gcloud.
+	cmd := exec.Command("gcloud", "config", "get-value", "core/project")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	err := cmd.Run()
+	if err != nil {
+		return "", errors.Wrap(err, "error when running gcloud command to get default project")
+	}
+
+	v := strings.Trim(out.String(), "\n")
+	if v == "" {
+		return "", errors.New("gcloud command returned empty project value")
+	}
+	return v, nil
 }
