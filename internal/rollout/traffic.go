@@ -27,7 +27,7 @@ func (r *Rollout) determineTraffic(svc *run.Service, diagnosis health.DiagnosisR
 			r.log.WithField("lastRollout", lastRollout).Debug("no enough time elapsed since last roll out")
 			return nil, nil
 		}
-		r.log.Debug("rolling forward")
+		r.log.Info("rolling forward")
 		return r.rollForwardTraffic(svc.Spec.Traffic, stable, candidate), nil
 	case health.Unhealthy:
 		r.log.Info("unhealthy candidate, rollback")
@@ -44,8 +44,6 @@ func (r *Rollout) determineTraffic(svc *run.Service, diagnosis health.DiagnosisR
 // It creates new traffic configurations for the candidate and stable revisions
 // and respects user-defined revision tags.
 func (r *Rollout) rollForwardTraffic(traffic []*run.TrafficTarget, stable, candidate string) []*run.TrafficTarget {
-	r.log.Debug("splitting traffic")
-
 	var newTraffic []*run.TrafficTarget
 	var stablePercent int64
 
