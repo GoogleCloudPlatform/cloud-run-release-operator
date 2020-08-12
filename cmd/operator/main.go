@@ -134,7 +134,7 @@ func main() {
 
 	if flProject == "" {
 		logger.Info("-project not specified, trying to autodetect one")
-		flProject, err = determineDefaultProject()
+		flProject, err = determineProjectID()
 		if err != nil {
 			logger.Fatalf("failed to detect project, must specify one with -project: %v", err)
 		} else {
@@ -253,25 +253,31 @@ func printHealthCriteria(logger *logrus.Logger, healthCriteria []config.HealthCr
 	}
 }
 
-func determineDefaultProject() (string, error) {
+func determineProjectID() (string, error) {
 	if metadata.OnGCE() {
 		v, err := metadata.ProjectID()
 		if err != nil {
-			return "", errors.Wrapf(err, "error when getting project ID from compute metadata: %v", err)
+			return "", errors.Wrapf(err, "error when getting project ID from compute metadata")
 		}
 		return v, nil
 	}
 
 	// Try to get project ID by retrieving default value in gcloud.
-	cmd := exec.Command("gcloud", "config", "get-value", "core/project")
-	var out bytes.Buffer
-	cmd.Stdout = &out
+	cmd := exec.Command("gcloud", "config", "get-value", "core/project", "-q")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
 	err := cmd.Run()
 	if err != nil {
-		return "", errors.Wrap(err, "error when running gcloud command to get default project")
+		msg := "error when running gcloud command to get default project"
+		if stderr.Len() != 0 {
+			msg += fmt.Sprintf(", stderr=%s", stderr.String())
+		}
+		return "", errors.Wrapf(err, msg)
 	}
 
-	v := strings.Trim(out.String(), "\n")
+	v := strings.TrimSpace(stdout.String())
 	if v == "" {
 		return "", errors.New("gcloud command returned empty project value")
 	}
