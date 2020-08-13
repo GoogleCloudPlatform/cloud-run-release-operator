@@ -13,9 +13,7 @@ one.
 
 Quick Links:
 
-* [How does it work](#how-does-it-work)
-* [Set it up on Cloud Run](#setup)
-* [Try it out (locally)](#try-out)
+
 
 ## How does it work?
 
@@ -152,7 +150,7 @@ To set up this on Cloud Run, run the following steps on your shell:
         --region=us-central1 \
         --image=gcr.io/$PROJECT_ID/cloud-run-release-manager \
         --service-account=release-manager@${PROJECT_ID}.iam.gserviceaccount.com \
-        --args=-project=$PROJECT_ID --args=-verbosity=debug
+        --args=-verbosity=debug
     ```
 
 1. Find the URL of your Cloud Run service and set as `URL` variable:
@@ -183,7 +181,7 @@ At this point, you can start deploying services with label
 and the Release Manager will slowly roll it out. See [this section](#try-out)
 for more details.
 
-## Configuration
+## Configuration <a id="configuration"></a>
 
 Currently, all the configuration arguments must be specified using command line
 flags:
@@ -227,6 +225,71 @@ ignore (default: `0`)
 ignore (default: `0`)
 - `-latency-p50`: Expected maximum latency for 50th percentile of requests, 0 to
 ignore (default: `0`)
+
+## Observability & Troubleshooting <a id="troubleshooting"></a>
+
+### What's happening with the rollout of my service?
+
+To view the current state of the rollout of a particular service, you can see
+the service's routing information.
+
+In Cloud Run, under the `Revisions` section, the first thing to notice is that
+the Release Manager has automatically assigned the `stable` label to your
+current stable revision and the `candidate` label to your last deployed
+revision. You can also see the percentage of traffic each revision is serving.
+
+#### Annotations
+
+For more detailed information on the rollout process, the service object
+contains some annotations with information about the rollout. In Cloud Run, you
+can see the service object in the `YAML` section.
+
+* `rollout.cloud.run/stableRevision` is the name of the current stable revision
+* `rollout.cloud.run/candidateRevision` is the revision name of the current
+  candidate
+* `rollout.cloud.run/lastFailedCandidateRevision` is the last revision that was
+considered a candidate but failed to meet the health criteria at some point of
+its rollout process
+* `rollout.cloud.run/lastRollout` contains the last time a rollout occurred
+(traffic to the candidate was increased)
+* `rollout.cloud.run/lastHealthReport` contains information on why a rollout or
+rollback occurred. It shows the results of the health assessment and the actual
+values for each of the metrics
+
+### Errors when rolling out
+
+#### All services
+
+To quickly find out if there are errors when rolling out any of your services,
+you can use the [Logs Viewer](http://console.cloud.google.com/logs). In the
+query builder, add:
+
+```plain
+resource.type = "cloud_run_revision"
+resource.labels.service_name = "release-manager"
+resource.labels.location = "us-central1"
+severity >= ERROR
+```
+
+The above filter will get all the error messages in your Release Manager
+service.
+
+#### A specific service
+
+If you want to filter the errors for a specific service that has opted-in for
+gradual rollout, you can include its service name in the query as follows:
+
+```plain
+resource.type = "cloud_run_revision"
+resource.labels.service_name = "release-manager"
+resource.labels.location = "us-central1"
+jsonPayload.context.data.service = "<YOUR_SERVICE>"
+severity >= ERROR
+```
+
+You can also include a full list of the logs by changing the severity filter to
+`severity >= DEBUG`. You must have set the flag `-verbosity=debug` when
+deploying the Release Manager to have full logs about your rollouts.
 
 ---
 
