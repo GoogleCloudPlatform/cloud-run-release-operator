@@ -111,7 +111,7 @@ func init() {
 
 	args := flag.Args()
 	if len(args) != 0 {
-		logrus.Fatalf("invalid command args %v", args)
+		logrus.Fatalf("positional arguments not accepted: %v", args)
 	}
 
 	if flRegionsString != "" {
