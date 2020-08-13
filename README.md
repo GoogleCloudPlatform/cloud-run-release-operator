@@ -277,7 +277,7 @@ service.
 #### A specific service
 
 If you want to filter the errors for a specific service that has opted-in for
-gradual rollout, you can include its service name in the query as follows:
+gradual rollout, you can include its service name in the query:
 
 ```plain
 resource.type = "cloud_run_revision"
