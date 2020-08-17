@@ -13,7 +13,11 @@ one.
 
 Quick Links:
 
-
+* [How does it work](#how-does-it-work)
+* [Try it out (locally)](#try-out)
+* [Set it up on Cloud Run](#setup)
+* [Configuration](#configuration)
+* [Observability & Troubleshooting](#troubleshooting)
 
 ## How does it work?
 
