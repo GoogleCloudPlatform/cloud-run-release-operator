@@ -32,11 +32,8 @@ one.
   * [Choosing services](#choosing-services)
   * [Rollout strategy](#rollout-strategy)
 - [Observability & Troubleshooting](#observability--troubleshooting)
-  * [What's happening with the rollout of my service?](#whats-happening-with-the-rollout-of-my-service)
-    + [Annotations](#annotations)
-  * [Errors when rolling out](#errors-when-rolling-out)
-    + [All services](#all-services)
-    + [A specific service](#a-specific-service)
+  * [What's happening with my rollout?](#whats-happening-with-my-rollout)
+  * [Release Manager logs](#release-manager-logs)
 
 <!-- tocstop -->
 
@@ -253,22 +250,32 @@ ignore (default: `0`)
 
 ## Observability & Troubleshooting
 
-### What's happening with the rollout of my service?
+### What's happening with my rollout?
 
-To view the current state of the rollout of a particular service, you can see
-the service's traffic configuration in [Cloud
-Run](http://console.cloud.google.com/run).
+To check the status of your rollout, go to [Cloud
+Run](http://console.cloud.google.com/run) and click on your service.
 
-Under the `Revisions` section, the first thing to notice is that the Release
-Manager has automatically assigned the `stable` tag to your current stable
-revision and the `candidate` tag to your last deployed revision. You can also
-see the percentage of traffic each revision is serving.
+Under the `Revisions` section, you can see how the traffic is currently split
+between your stable and candidate revisions.
 
-#### Annotations
+For more detailed information, you can use the annotations automatically added
+by the Release Manager. To view the annotations, click on the `YAML` section:
 
-For more detailed information on the rollout process, the service object
-contains some annotations with information about the rollout. In Cloud Run, you
-can see the service object in the `YAML` section.
+**Sample annotation:**
+
+```yaml
+rollout.cloud.run/stableRevision: hello-00040-opa
+rollout.cloud.run/candidateRevision: hello-00039-boc
+rollout.cloud.run/lastFailedCandidateRevision: hello-00032-doc
+rollout.cloud.run/lastRollout: '2020-08-13T15:35:10-04:00'
+rollout.cloud.run/lastHealthReport: |-
+  status: healthy
+  metrics:
+  - request-count: 150 (needs 100)
+  - error-rate-percent: 1.00 (needs 1.00)
+  - request-latency[p99]: 503.23 (needs 750.00)
+  lastUpdate: 2020-08-13T15:35:10-04:00
+```
 
 - `rollout.cloud.run/stableRevision` is the name of the current stable revision
 - `rollout.cloud.run/candidateRevision` is the revision name of the current
@@ -282,12 +289,10 @@ can see the service object in the `YAML` section.
   rollback occurred. It shows the results of the health assessment and the
   actual values for each of the metrics
 
-### Errors when rolling out
-
-#### All services
+### Release Manager logs
 
 To quickly find out if there are errors when rolling out any of your services,
-you can use the [Logs Viewer](http://console.cloud.google.com/logs). In the
+you can query the [Logs Viewer](http://console.cloud.google.com/logs). In the
 query builder, add:
 
 ```plain
@@ -297,13 +302,8 @@ resource.labels.location = "us-central1"
 severity >= ERROR
 ```
 
-The above filter will get all the error messages in your Release Manager
-service.
-
-#### A specific service
-
-If you want to filter the errors for a specific service that has opted-in for
-gradual rollout, you can include its service name in the query:
+If you want to filter the errors for a specific service, you can include the
+service's name in the query:
 
 ```plain
 resource.type = "cloud_run_revision"
