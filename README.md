@@ -40,11 +40,15 @@ one.
 ## How does it work?
 
 Cloud Run Release Manager periodically checks for new revisions in the services
-that opted-in for gradual rollouts. To opt-in services for gradual rollouts, a
-label must be assigned to them. If a new revision with no traffic is found in
-these services, the Release Manager automatically assigns some initial traffic
-to the new revision. This new revision is tagged `candidate` while the previous
-revision serving traffic is tagged `stable`.
+that opted-in for gradual rollouts.
+
+To opt-in services for gradual rollouts, a label must be assigned to them. If a
+new revision with no traffic is found in these services, the Release Manager
+automatically assigns some initial traffic to the new revision.
+
+The Release Manager manages 2 revisions at a time: the last revision that
+reached 100% of the traffic which is tagged `stable` and the newest deployment
+which is tagged `candidate`.
 
 Depending on the candidate's health, traffic to the `candidate` is increased or
 traffic to the candidate is dropped and is redirected to the `stable` revision.
