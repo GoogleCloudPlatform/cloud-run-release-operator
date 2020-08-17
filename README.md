@@ -90,7 +90,16 @@ to **v1**
 
 ## Try it out (locally)
 
-1. Check out this repository.
+1. Configure your service(s) to be selected for gradual rollouts by adding the
+   `rollout-strategy=gradual` label to your service(s):
+
+    ```sh
+    gcloud run services update <YOUR_SERVICE> \
+    --labels rollout-strategy=gradual \
+    --region us-east1
+    ```
+
+1. Clone this repository.
 1. Make sure you have Go compiler installed, run:
 
     ```sh
@@ -99,7 +108,7 @@ to **v1**
 
 1. To start the program, run:
 
-    ```shell
+    ```sh
     ./cloud_run_release_manager -cli -project=<YOUR_PROJECT>
     ```
 
@@ -107,11 +116,14 @@ Once you run this command, it will check the health of Cloud Run services with
 the label `rollout-strategy=gradual` every minute by looking at the candidate's
 metrics for the past 30 minutes by default.
 
-- The health is determined using the metrics and configured health criteria
-- By default, the only health criteria is a expected max server error rate of
+* The health is determined using the metrics and configured health criteria
+* The Release Manager expects `100` requests in the past 30 minutes before
+  assessing the candidate's health. If no enough requests were made, no rollout
+  or rollback is performed
+* By default, the only health criteria is a expected max server error rate of
 1%
-- If metrics show a healthy candidate, traffic to candidate is increased
-- If metrics show an unhealthy candidate, a roll back is performed.
+* If metrics show a healthy candidate, traffic to candidate is increased
+* If metrics show an unhealthy candidate, a roll back is performed.
 
 ## Setup on GCP
 
