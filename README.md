@@ -116,14 +116,31 @@ Once you run this command, it will check the health of Cloud Run services with
 the label `rollout-strategy=gradual` every minute by looking at the candidate's
 metrics for the past 30 minutes by default.
 
-* The health is determined using the metrics and configured health criteria
-* The Release Manager expects `100` requests in the past 30 minutes before
-  assessing the candidate's health. If no enough requests were made, no rollout
-  or rollback is performed
-* By default, the only health criteria is a expected max server error rate of
-1%
-* If metrics show a healthy candidate, traffic to candidate is increased
-* If metrics show an unhealthy candidate, a roll back is performed.
+The health is determined using the metrics and configured health criteria. If
+metrics show a healthy candidate, traffic to candidate is increased. But if
+metrics show an unhealthy candidate, a roll back is performed.
+
+### Default rollout configuration
+
+When running the Release Manager, default configuration values are used. The
+most relevant values are:
+
+* `-healthcheck-offset=30m`: When assessing the candidate's health, the Release
+  Manager will get metrics about the candidate revision from the last 30
+  minutes
+* `-min-requests=100`: The Release Manager expects `100` requests in the past 30
+  minutes (given by `healthcheck-offset`). If no enough requests were made in
+  that interval, no rollout or rollback is performed even if the other metrics
+  show a healthy/unhealthy candidate
+* `-max-error-rate=1`: By default, the only health criteria is a expected max
+  server error rate of 1%
+* `-min-wait=30m`: If the candidate revision got the minimum number of requests
+  and was healthy, it can only be rolled out further only if 30 minutes since
+  last roll out has elapsed. If the candidate was unhealthy, however, it is
+  rolled back independent of the elapsed time since last rollout.
+
+The configuration values can be changed as described in the
+[configuration section](#configuration).
 
 ## Setup on GCP
 
