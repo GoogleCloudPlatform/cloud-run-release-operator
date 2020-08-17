@@ -13,6 +13,13 @@ one.
 
 ## Table of Contents
 
+<!--
+  ⚠️ DO NOT UPDATE THE TABLE OF CONTENTS MANUALLY ️️⚠️
+  run `npx markdown-toc -i README.md`.
+
+  Please stick to 80-character line wraps as much as you can.
+-->
+
 <!-- toc -->
 
 - [How does it work?](#how-does-it-work)
@@ -249,12 +256,13 @@ ignore (default: `0`)
 ### What's happening with the rollout of my service?
 
 To view the current state of the rollout of a particular service, you can see
-the service's routing information.
+the service's traffic configuration in [Cloud
+Run](http://console.cloud.google.com/run).
 
-In Cloud Run, under the `Revisions` section, the first thing to notice is that
-the Release Manager has automatically assigned the `stable` label to your
-current stable revision and the `candidate` label to your last deployed
-revision. You can also see the percentage of traffic each revision is serving.
+Under the `Revisions` section, the first thing to notice is that the Release
+Manager has automatically assigned the `stable` tag to your current stable
+revision and the `candidate` tag to your last deployed revision. You can also
+see the percentage of traffic each revision is serving.
 
 #### Annotations
 
