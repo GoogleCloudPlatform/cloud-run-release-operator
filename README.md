@@ -11,13 +11,27 @@ one.
 > You might encounter issues in production, since this project is currently in
 > **alpha**.
 
-Quick Links:
+## Table of Contents
 
-* [How does it work](#how-does-it-work)
-* [Try it out (locally)](#try-out)
-* [Set it up on Cloud Run](#setup)
-* [Configuration](#configuration)
-* [Observability & Troubleshooting](#troubleshooting)
+<!-- toc -->
+
+- [How does it work?](#how-does-it-work)
+  * [Examples](#examples)
+    + [Scenario 1: Automated Rollouts](#scenario-1-automated-rollouts)
+    + [Scenario 2: Automated Rollbacks](#scenario-2-automated-rollbacks)
+- [Try it out (locally)](#try-it-out-locally)
+- [Setup](#setup)
+- [Configuration](#configuration)
+  * [Choosing services](#choosing-services)
+  * [Rollout strategy](#rollout-strategy)
+- [Observability & Troubleshooting](#observability--troubleshooting)
+  * [What's happening with the rollout of my service?](#whats-happening-with-the-rollout-of-my-service)
+    + [Annotations](#annotations)
+  * [Errors when rolling out](#errors-when-rolling-out)
+    + [All services](#all-services)
+    + [A specific service](#a-specific-service)
+
+<!-- tocstop -->
 
 ## How does it work?
 
@@ -63,7 +77,7 @@ to **v1**
 
 ![Rollout stages](assets/rollback-stages.svg "Rollout stages from v1 to v2")
 
-## Try it out (locally)  <a id="try-out"></a>
+## Try it out (locally)
 
 1. Check out this repository.
 1. Make sure you have Go compiler installed, run:
@@ -88,7 +102,7 @@ metrics for the past 30 minutes by default.
 - If metrics show a healthy candidate, traffic to candidate is increased
 - If metrics show an unhealthy candidate, a roll back is performed.
 
-## Setup <a id="setup"></a>
+## Setup
 
 Cloud Run Release Manager is distributed as a server deployed to
 Cloud Run, invoked periodically by [Cloud
@@ -185,7 +199,7 @@ At this point, you can start deploying services with label
 and the Release Manager will slowly roll it out. See [this section](#try-out)
 for more details.
 
-## Configuration <a id="configuration"></a>
+## Configuration
 
 Currently, all the configuration arguments must be specified using command line
 flags:
@@ -230,7 +244,7 @@ ignore (default: `0`)
 - `-latency-p50`: Expected maximum latency for 50th percentile of requests, 0 to
 ignore (default: `0`)
 
-## Observability & Troubleshooting <a id="troubleshooting"></a>
+## Observability & Troubleshooting
 
 ### What's happening with the rollout of my service?
 
