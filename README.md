@@ -292,8 +292,7 @@ rollout.cloud.run/lastHealthReport: |-
 ### Release Manager logs
 
 To quickly find out if there are errors when rolling out any of your services,
-you can query the [Logs Viewer](http://console.cloud.google.com/logs). In the
-query builder, add:
+you can [query the Logs Viewer for errors](https://console.cloud.google.com/logs/viewer?folder=true&organizationId=true&minLogLevel=0&expandAll=false&customFacets=&limitCustomFacetWidth=true&advancedFilter=resource.type%20%3D%20%22cloud_run_revision%22%0Aresource.labels.service_name%20%3D%20%22release-manager%22%0Aresource.labels.location%20%3D%20%22us-central1%22%0Aseverity%20%3E%3D%20ERROR&interval=NO_LIMIT):
 
 ```plain
 resource.type = "cloud_run_revision"
@@ -306,11 +305,7 @@ If you want to filter the errors for a specific service, you can include the
 service's name in the query:
 
 ```plain
-resource.type = "cloud_run_revision"
-resource.labels.service_name = "release-manager"
-resource.labels.location = "us-central1"
 jsonPayload.context.data.service = "<YOUR_SERVICE>"
-severity >= ERROR
 ```
 
 You can also include a full list of the logs by changing the severity filter to
