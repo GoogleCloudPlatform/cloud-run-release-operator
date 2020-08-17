@@ -27,7 +27,7 @@ one.
     + [Scenario 1: Automated Rollouts](#scenario-1-automated-rollouts)
     + [Scenario 2: Automated Rollbacks](#scenario-2-automated-rollbacks)
 - [Try it out (locally)](#try-it-out-locally)
-- [Setup](#setup)
+- [Setup on GCP](#setup-on-gcp)
 - [Configuration](#configuration)
   * [Choosing services](#choosing-services)
   * [Rollout strategy](#rollout-strategy)
@@ -40,13 +40,14 @@ one.
 ## How does it work?
 
 Cloud Run Release Manager periodically checks for new revisions in the services
-that opted-in for gradual rollouts. If a new revision with no traffic is found,
-the Release Manager automatically assigns it some initial traffic. This new
-revision is labeled `candidate` while the previous revision serving traffic is
-labeled `stable`.
+that opted-in for gradual rollouts. To opt-in services for gradual rollouts, a
+label must be assigned to them. If a new revision with no traffic is found in
+these services, the Release Manager automatically assigns some initial traffic
+to the new revision. This new revision is tagged `candidate` while the previous
+revision serving traffic is tagged `stable`.
 
-Depending on the candidate's health, traffic to the `candidate` is increased
-or traffic to the candidate is dropped and is redirected to the `stable` revision.
+Depending on the candidate's health, traffic to the `candidate` is increased or
+traffic to the candidate is dropped and is redirected to the `stable` revision.
 
 ### Examples
 
@@ -106,13 +107,14 @@ metrics for the past 30 minutes by default.
 - If metrics show a healthy candidate, traffic to candidate is increased
 - If metrics show an unhealthy candidate, a roll back is performed.
 
-## Setup
+## Setup on GCP
 
-Cloud Run Release Manager is distributed as a server deployed to
-Cloud Run, invoked periodically by [Cloud
+Cloud Run Release Manager is distributed as a service deployed to Cloud Run on
+your own project, invoked periodically by [Cloud
 Scheduler](https://cloud.google.com/scheduler/).
 
-To set up this on Cloud Run, run the following steps on your shell:
+To set up the Release Manager on Cloud Run, run the following steps on your
+shell:
 
 1. Set your project ID in a variable:
 
