@@ -270,17 +270,17 @@ For more detailed information on the rollout process, the service object
 contains some annotations with information about the rollout. In Cloud Run, you
 can see the service object in the `YAML` section.
 
-* `rollout.cloud.run/stableRevision` is the name of the current stable revision
-* `rollout.cloud.run/candidateRevision` is the revision name of the current
+- `rollout.cloud.run/stableRevision` is the name of the current stable revision
+- `rollout.cloud.run/candidateRevision` is the revision name of the current
   candidate
-* `rollout.cloud.run/lastFailedCandidateRevision` is the last revision that was
-considered a candidate but failed to meet the health criteria at some point of
-its rollout process
-* `rollout.cloud.run/lastRollout` contains the last time a rollout occurred
-(traffic to the candidate was increased)
-* `rollout.cloud.run/lastHealthReport` contains information on why a rollout or
-rollback occurred. It shows the results of the health assessment and the actual
-values for each of the metrics
+- `rollout.cloud.run/lastFailedCandidateRevision` is the last revision that was
+  considered a candidate but failed to meet the health criteria at some point of
+  its rollout process
+- `rollout.cloud.run/lastRollout` contains the last time a rollout occurred
+  (traffic to the candidate was increased)
+- `rollout.cloud.run/lastHealthReport` contains information on why a rollout or
+  rollback occurred. It shows the results of the health assessment and the
+  actual values for each of the metrics
 
 ### Errors when rolling out
 
