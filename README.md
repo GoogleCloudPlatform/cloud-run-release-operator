@@ -127,18 +127,12 @@ When running the Release Manager, default configuration values are used. The
 most relevant values are:
 
 - `-healthcheck-offset=30m`: When assessing the candidate's health, the Release
-  Manager will get metrics about the candidate revision from the last 30
-  minutes
-- `-min-requests=100`: The Release Manager expects `100` requests in the past 30
-  minutes (given by `healthcheck-offset`). If no enough requests were made in
-  that interval, no rollout or rollback is performed even if the other metrics
-  show a healthy/unhealthy candidate
+  Manager will get metrics about the candidate revision from the last 30 minutes
 - `-max-error-rate=1`: By default, the only health criteria is a expected max
   server error rate of 1%
-- `-min-wait=30m`: If the candidate revision got the minimum number of requests
-  and was healthy, it can be rolled out further only if 30 minutes since last
-  roll out has elapsed. If the candidate was unhealthy, however, it is rolled
-  back independent of the elapsed time since last rollout.
+- `-min-wait=30m`: If the candidate revision is healthy, it can be rolled out
+  further only if 30 minutes since last roll out has elapsed. If the candidate
+  was unhealthy, however, it is rolled back independent of the elapsed time.
 
 The configuration values can be changed as described in the
 [configuration section](#configuration).
