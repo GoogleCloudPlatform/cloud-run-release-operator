@@ -59,7 +59,9 @@ func TestDiagnosis(t *testing.T) {
 			results: []float64{800, 750.0},
 			expected: health.Diagnosis{
 				OverallResult: health.Inconclusive,
-				CheckResults:  nil,
+				CheckResults: []health.CheckResult{
+					{Threshold: 1000, ActualValue: 800, IsCriteriaMet: false},
+				},
 			},
 		},
 		{
