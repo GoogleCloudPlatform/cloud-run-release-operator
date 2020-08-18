@@ -291,8 +291,12 @@ rollout.cloud.run/lastHealthReport: |-
 
 ### Release Manager logs
 
-To quickly find out if there are errors when rolling out any of your services,
-you can [query the Logs Viewer for errors](https://console.cloud.google.com/logs/viewer?advancedFilter=resource.type%20%3D%20%22cloud_run_revision%22%0Aresource.labels.service_name%20%3D%20%22release-manager%22%0Aresource.labels.location%20%3D%20%22us-central1%22%0Aseverity%20%3E%3D%20ERROR&interval=NO_LIMIT):
+You can quickly find out if there are errors when rolling out any of your
+services by querying for errors in the [Logs
+Viewer](https://console.cloud.google.com/logs)
+
+[Click to run the
+query](https://console.cloud.google.com/logs/viewer?advancedFilter=resource.type%20%3D%20%22cloud_run_revision%22%0Aresource.labels.service_name%20%3D%20%22release-manager%22%0Aresource.labels.location%20%3D%20%22us-central1%22%0Aseverity%20%3E%3D%20ERROR&interval=NO_LIMIT)
 
 ```plain
 resource.type = "cloud_run_revision"
