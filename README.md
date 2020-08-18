@@ -128,6 +128,12 @@ most relevant values are:
 
 - `-healthcheck-offset=30m`: When assessing the candidate's health, the Release
   Manager will get metrics about the candidate revision from the last 30 minutes
+- `-min-requests=0`: The Release Manager expects this number of requests in the
+  past 30 minutes (given by `healthcheck-offset`). If no enough requests were
+  made in that interval, no rollout or rollback is performed even if the other
+  metrics show a healthy/unhealthy candidate. The default value of `0` means
+  that the number of requests should be ignored when the Release Manager makes
+  a decission about rolling out/back.
 - `-max-error-rate=1`: By default, the only health criteria is a expected max
   server error rate of 1%
 - `-min-wait=30m`: If the candidate revision is healthy, it can be rolled out
@@ -204,7 +210,7 @@ shell:
         --region=us-central1 \
         --image=gcr.io/$PROJECT_ID/cloud-run-release-manager \
         --service-account=release-manager@${PROJECT_ID}.iam.gserviceaccount.com \
-        --args=-verbosity=debug
+        --args=-verbosity=debug,-healthcheck-offset=30m,-min-requests=0,-max-error-rate=1,-min-wait=30m
     ```
 
 1. Find the URL of your Cloud Run service and set as `URL` variable:
