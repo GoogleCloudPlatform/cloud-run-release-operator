@@ -42,16 +42,18 @@ one.
 Cloud Run Release Manager periodically checks for new revisions in the services
 that opted-in for gradual rollouts.
 
-To opt-in services for gradual rollouts, a label must be assigned to them. If a
-new revision with no traffic is found in these services, the Release Manager
-automatically assigns some initial traffic to the new revision.
+To opt-in services for gradual rollouts, you should label your services with
+`rollout-strategy=gradual` (default value). If a service has a newly deployed
+revision with 0% traffic, the Release Manager automatically assigns some initial
+traffic to the new revision (5% by default).
 
 The Release Manager manages 2 revisions at a time: the last revision that
-reached 100% of the traffic which is tagged `stable` and the newest deployment
-which is tagged `candidate`.
+reached 100% of the traffic (tagged as `stable`) and the newest deployment
+(tagged as `candidate`).
 
-Depending on the candidate's health, traffic to the `candidate` is increased or
-traffic to the candidate is dropped and is redirected to the `stable` revision.
+Depending on the candidate revision’s health and other configurable factors
+(such as served request count or time elapsed), this revision is either
+gradually rolled out to a higher percentage of traffic, or entirely rolled back.
 
 ### Examples
 
