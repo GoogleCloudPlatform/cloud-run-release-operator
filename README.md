@@ -27,6 +27,7 @@ one.
     + [Scenario 1: Automated Rollouts](#scenario-1-automated-rollouts)
     + [Scenario 2: Automated Rollbacks](#scenario-2-automated-rollbacks)
 - [Try it out (locally)](#try-it-out-locally)
+  * [Default rollout configuration](#default-rollout-configuration)
 - [Setup on GCP](#setup-on-gcp)
 - [Configuration](#configuration)
   * [Choosing services](#choosing-services)
@@ -134,8 +135,8 @@ most relevant values are:
   metrics show a healthy/unhealthy candidate. The default value of `0` means
   that the number of requests should be ignored when the Release Manager makes
   a decission about rolling out/back.
-- `-max-error-rate=1`: By default, the only health criteria is a expected max
-  server error rate of 1%
+- `-max-error-rate=1` (in percent): By default, the only health criteria is a
+  expected max server error rate of 1%
 - `-min-wait=30m`: If the candidate revision is healthy, it can be rolled out
   further only if 30 minutes since last roll out has elapsed. If the candidate
   was unhealthy, however, it is rolled back independent of the elapsed time.
@@ -210,8 +211,15 @@ shell:
         --region=us-central1 \
         --image=gcr.io/$PROJECT_ID/cloud-run-release-manager \
         --service-account=release-manager@${PROJECT_ID}.iam.gserviceaccount.com \
-        --args=-verbosity=debug,-healthcheck-offset=30m,-min-requests=0,-max-error-rate=1,-min-wait=30m
+        --args=-verbosity=debug \
+        --args=-healthcheck-offset=30m \
+        --args=-min-requests=0 \
+        --args=-max-error-rate=1 \
+        --args=-min-wait=30m
     ```
+
+    See [this section](#default-rollout-configuration) for more details on the
+    arguments.
 
 1. Find the URL of your Cloud Run service and set as `URL` variable:
 
@@ -238,8 +246,8 @@ shell:
 
 At this point, you can start deploying services with label
 `rollout-strategy=gradual` and deploy new revisions with `--no-traffic` option
-and the Release Manager will slowly roll it out. See [this section](#try-out)
-for more details.
+and the Release Manager will slowly roll it out. See [this
+section](#try-it-out-locally) for more details.
 
 ## Configuration
 
