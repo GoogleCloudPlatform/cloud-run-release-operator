@@ -313,6 +313,7 @@ func TestUpdateService(t *testing.T) {
 				rollout.LastHealthReportAnnotation: "status: inconclusive\n" +
 					"metrics:" +
 					"\n- request-count: 1000 (needs 1500)" +
+					"\n- error-rate-percent: 1.00 (needs 5.00)" +
 					fmt.Sprintf("\nlastUpdate: %s", clockMock.Now().Format(time.RFC3339)),
 			},
 			changedTraffic: false,

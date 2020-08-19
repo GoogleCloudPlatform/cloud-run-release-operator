@@ -82,24 +82,22 @@ func Diagnose(ctx context.Context, healthCriteria []config.HealthCriterion, actu
 		}
 
 		isMet := isCriteriaMet(criteria.Metric, criteria.Threshold, value)
-		result := CheckResult{Threshold: criteria.Threshold, ActualValue: value}
+		result := CheckResult{Threshold: criteria.Threshold, ActualValue: value, IsCriteriaMet: isMet}
+		results = append(results, result)
 
-		// For unmet request count, return inconclusive and empty results.
+		// For unmet request count, return inconclusive unless diagnosis is
+		// unhealthy.
 		if !isMet && criteria.Metric == config.RequestCountMetricsCheck {
-			logger.Debug("unmet criterion")
-			diagnosis = Inconclusive
-			// TODO: This will be an issue if the request count is not the first
-			// criterion in the array since the caller can assume the order
-			// of the check results is the same as the order of the health
-			// criteria.
-			results = []CheckResult{result}
-			break
+			logger.Debug("unmet request count criterion")
+			if diagnosis != Unhealthy {
+				diagnosis = Inconclusive
+			}
+			continue
 		}
 
 		if !isMet {
 			logger.Debug("unmet criterion")
 			diagnosis = Unhealthy
-			results = append(results, result)
 			continue
 		}
 
@@ -108,7 +106,6 @@ func Diagnose(ctx context.Context, healthCriteria []config.HealthCriterion, actu
 			diagnosis = Healthy
 		}
 		result.IsCriteriaMet = true
-		results = append(results, result)
 		logger.Debug("met criterion")
 	}
 
