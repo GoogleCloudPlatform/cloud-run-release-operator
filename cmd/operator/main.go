@@ -68,7 +68,9 @@ var (
 	// Anthos target configuration
 	flGKEClusterLocation string
 	flGKECluster         string
-	flGKENamespace       string
+	// TODO(gvso): Support multiple namespaces or all namespaces if none is
+	// specified.
+	flGKENamespace string
 
 	// Fully-managed target config. Empty array means all regions.
 	flRegions       []string
