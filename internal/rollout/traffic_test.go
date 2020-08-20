@@ -5,14 +5,14 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/cloud-run-release-manager/internal/config"
+	kmock "github.com/GoogleCloudPlatform/cloud-run-release-manager/internal/knative/mock"
 	metricsmock "github.com/GoogleCloudPlatform/cloud-run-release-manager/internal/metrics/mock"
-	runmock "github.com/GoogleCloudPlatform/cloud-run-release-manager/internal/run/mock"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/api/run/v1"
 )
 
 func TestRollForwardTraffic(t *testing.T) {
-	runclient := &runmock.RunAPI{}
+	kProvider := &kmock.Provider{}
 	metricsMock := &metricsmock.Metrics{}
 	strategy := config.Strategy{
 		Steps: []int64{5, 30, 60},
@@ -129,7 +129,7 @@ func TestRollForwardTraffic(t *testing.T) {
 		}
 		svcRecord := &ServiceRecord{Service: svc}
 
-		r := New(context.TODO(), metricsMock, svcRecord, strategy).WithClient(runclient)
+		r := New(context.TODO(), metricsMock, svcRecord, strategy).WithKnativeProvider(kProvider)
 
 		t.Run(test.name, func(tt *testing.T) {
 			traffic := r.rollForwardTraffic(svc.Spec.Traffic, test.stable, test.candidate)
