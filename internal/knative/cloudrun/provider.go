@@ -107,7 +107,8 @@ func (p *Provider) LoggingFields() logrus.Fields {
 	}
 }
 
-// Regions gets the supported regions for the project.
+// Regions gets the supported regions for the project (for Cloud Run fully
+//	managed).
 func Regions(ctx context.Context, project string) ([]string, error) {
 	logger := util.LoggerFrom(ctx)
 	if len(regions) != 0 {
@@ -132,7 +133,7 @@ func Regions(ctx context.Context, project string) ([]string, error) {
 	return regions, nil
 }
 
-// generateServiceName returns the name of the specified service. It returns the
+// serviceName returns the name of the specified service. It returns the
 // form namespaces/{namespace_id}/services/{service_id}.
 //
 // For Cloud Run (fully managed), the namespace is the project ID or number.
