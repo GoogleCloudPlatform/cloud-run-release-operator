@@ -101,7 +101,7 @@ func init() {
 	flag.BoolVar(&flCLI, "cli", false, "run as CLI application to manage rollout in intervals")
 	flag.DurationVar(&flCLILoopInterval, "cli-run-interval", 60*time.Second, "the time between each rollout process (in seconds)")
 	flag.StringVar(&flHTTPAddr, "http-addr", defaultAddr, "address where to listen to http requests (e.g. :8080)")
-	flag.StringVar(&flPlatform, "platform", config.PlatformManaged, "target platform to query for Knative services")
+	flag.StringVar(&flPlatform, "platform", config.PlatformManaged, "target platform to query for Knative services (managed or gke)")
 	flag.StringVar(&flProject, "project", "", "project in which the service is deployed")
 	flag.StringVar(&flLabelSelector, "label", "rollout-strategy=gradual", "filter services based on a label (e.g. team=backend)")
 	flag.StringVar(&flGKEClusterLocation, "cluster-location", "", "zone in which the cluster is located")
@@ -158,10 +158,10 @@ func main() {
 		}
 	}
 
-	logger.Debug(flagsToString())
 	if err := validateFlags(); err != nil {
 		logger.Fatalf("invalid flags: %v", err)
 	}
+	logger.Debug(flagsToString())
 
 	// Configuration.
 	var target config.Target
