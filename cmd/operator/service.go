@@ -47,7 +47,7 @@ func getTargetedServices(ctx context.Context, target config.Target) ([]*rollout.
 				return
 			}
 
-			svcs, err := getServicesByLabel(ctx, provider, project, target.LabelSelector)
+			svcs, err := getServicesByLabel(ctx, provider, project, labelSelector)
 			if err != nil {
 				retError = err
 				cancel()
