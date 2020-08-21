@@ -53,7 +53,7 @@ func runRollouts(ctx context.Context, logger *logrus.Logger, strategy config.Str
 func handleRollout(ctx context.Context, logger *logrus.Logger, service *rollout.ServiceRecord, strategy config.Strategy) error {
 	lg := logger.WithFields(service.KProvider.LoggingFields())
 
-	metricsProvider, err := chooseMetricsProvider(ctx, lg, service.Namespace, service.Region, service.Metadata.Name)
+	metricsProvider, err := chooseMetricsProvider(ctx, lg, service.Namespace, service.Location, service.Metadata.Name)
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize metrics provider")
 	}

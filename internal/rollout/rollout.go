@@ -31,7 +31,9 @@ type ServiceRecord struct {
 	*run.Service
 	KProvider knative.Provider
 	Namespace string
-	Region    string
+
+	// The zone or region the service is deployed at.
+	Location string
 }
 
 // Rollout is the rollout manager.

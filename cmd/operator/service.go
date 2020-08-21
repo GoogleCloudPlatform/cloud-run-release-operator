@@ -107,11 +107,11 @@ func determineRegions(ctx context.Context, target config.Target) ([]string, erro
 }
 
 // newServiceRecord creates a new service record.
-func newServiceRecord(svc *run.Service, provider knative.Provider, namespace, region string) *rollout.ServiceRecord {
+func newServiceRecord(svc *run.Service, provider knative.Provider, namespace, location string) *rollout.ServiceRecord {
 	return &rollout.ServiceRecord{
 		Service:   svc,
 		KProvider: provider,
 		Namespace: namespace,
-		Region:    region,
+		Location:  location,
 	}
 }
