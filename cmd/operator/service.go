@@ -37,17 +37,17 @@ func getTargetedServices(ctx context.Context, target config.Target) ([]*rollout.
 	for _, region := range regions {
 		wg.Add(1)
 
-		go func(ctx context.Context, logger *logrus.Entry, region, labelSelector string) {
+		go func(ctx context.Context, logger *logrus.Entry, project, region, labelSelector string) {
 			defer wg.Done()
 
-			provider, err := cloudrun.NewFullyManagedProvider(ctx, target.Project, region)
+			provider, err := cloudrun.NewFullyManagedProvider(ctx, project, region)
 			if err != nil {
 				retError = errors.Wrap(err, "failed to initialize Cloud Run fully managed client")
 				cancel()
 				return
 			}
 
-			svcs, err := getServicesByLabel(ctx, provider, target.Project, target.LabelSelector)
+			svcs, err := getServicesByLabel(ctx, provider, project, target.LabelSelector)
 			if err != nil {
 				retError = err
 				cancel()
@@ -56,11 +56,10 @@ func getTargetedServices(ctx context.Context, target config.Target) ([]*rollout.
 
 			for _, svc := range svcs {
 				mu.Lock()
-				retServices = append(retServices, newServiceRecord(svc, provider, target.Project, region))
+				retServices = append(retServices, newServiceRecord(svc, provider, project, region))
 				mu.Unlock()
 			}
-
-		}(ctx, logger, region, target.LabelSelector)
+		}(ctx, logger, target.Project, region, target.LabelSelector)
 	}
 
 	wg.Wait()
