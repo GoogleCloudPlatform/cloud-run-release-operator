@@ -8,8 +8,8 @@ import (
 
 	"github.com/GoogleCloudPlatform/cloud-run-release-manager/internal/config"
 	"github.com/GoogleCloudPlatform/cloud-run-release-manager/internal/health"
+	"github.com/GoogleCloudPlatform/cloud-run-release-manager/internal/knative"
 	"github.com/GoogleCloudPlatform/cloud-run-release-manager/internal/metrics"
-	runapi "github.com/GoogleCloudPlatform/cloud-run-release-manager/internal/run"
 	"github.com/GoogleCloudPlatform/cloud-run-release-manager/internal/util"
 	"github.com/jonboulle/clockwork"
 	"github.com/pkg/errors"
@@ -29,8 +29,9 @@ const (
 // ServiceRecord holds a service object and information about it.
 type ServiceRecord struct {
 	*run.Service
-	Project string
-	Region  string
+	KProvider knative.Provider
+	Namespace string
+	Location  string
 }
 
 // Rollout is the rollout manager.
@@ -38,11 +39,11 @@ type Rollout struct {
 	ctx             context.Context
 	metricsProvider metrics.Provider
 	service         *run.Service
+	namespace       string
 	serviceName     string
-	project         string
 	region          string
 	strategy        config.Strategy
-	runClient       runapi.Client
+	kProvider       knative.Provider
 	log             *logrus.Entry
 	time            clockwork.Clock
 
@@ -73,23 +74,23 @@ func New(ctx context.Context, metricsProvider metrics.Provider, svcRecord *Servi
 		metricsProvider: metricsProvider,
 		service:         svcRecord.Service,
 		serviceName:     svcRecord.Metadata.Name,
-		project:         svcRecord.Project,
-		region:          svcRecord.Region,
+		namespace:       svcRecord.Namespace,
+		kProvider:       svcRecord.KProvider,
 		strategy:        strategy,
 		log:             logrus.NewEntry(logrus.New()),
 		time:            clockwork.NewRealClock(),
 	}
 }
 
-// WithClient updates the client in the rollout instance.
-func (r *Rollout) WithClient(client runapi.Client) *Rollout {
-	r.runClient = client
+// WithKnativeProvider updates the Knative provider in the rollout instance.
+func (r *Rollout) WithKnativeProvider(provider knative.Provider) *Rollout {
+	r.kProvider = provider
 	return r
 }
 
 // WithLogger updates the logger in the rollout instance.
-func (r *Rollout) WithLogger(logger *logrus.Logger) *Rollout {
-	r.log = logger.WithField("project", r.project)
+func (r *Rollout) WithLogger(logger *logrus.Entry) *Rollout {
+	r.log = logger
 	return r
 }
 
@@ -101,12 +102,6 @@ func (r *Rollout) WithClock(clock clockwork.Clock) *Rollout {
 
 // Rollout handles the gradual rollout.
 func (r *Rollout) Rollout() (bool, error) {
-	r.log = r.log.WithFields(logrus.Fields{
-		"project": r.project,
-		"service": r.serviceName,
-		"region":  r.region,
-	})
-
 	_, trafficChanged, err := r.UpdateService(r.service)
 	if err != nil {
 		return false, errors.Wrapf(err, "failed to perform rollout")
@@ -175,7 +170,7 @@ func (r *Rollout) UpdateService(svc *run.Service) (*run.Service, bool, error) {
 
 // replaceService updates the service object in Cloud Run.
 func (r *Rollout) replaceService(svc *run.Service) error {
-	_, err := r.runClient.ReplaceService(r.project, r.serviceName, svc)
+	_, err := r.kProvider.ReplaceService(r.namespace, r.serviceName, svc)
 	return errors.Wrapf(err, "could not update service %q", r.serviceName)
 }
 

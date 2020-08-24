@@ -7,12 +7,11 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/cloud-run-release-manager/internal/config"
+	kmock "github.com/GoogleCloudPlatform/cloud-run-release-manager/internal/knative/mock"
 	"github.com/GoogleCloudPlatform/cloud-run-release-manager/internal/metrics"
 	metricsmock "github.com/GoogleCloudPlatform/cloud-run-release-manager/internal/metrics/mock"
 	"github.com/GoogleCloudPlatform/cloud-run-release-manager/internal/rollout"
-	runmock "github.com/GoogleCloudPlatform/cloud-run-release-manager/internal/run/mock"
 	"github.com/jonboulle/clockwork"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/api/run/v1"
 )
@@ -46,7 +45,7 @@ func makeLastRolloutAnnotation(clock clockwork.Clock, offsetFromNowMinute int) s
 }
 
 func TestUpdateService(t *testing.T) {
-	runclient := &runmock.RunAPI{}
+	kProvider := &kmock.Provider{}
 	clockMock := clockwork.NewFakeClock()
 	metricsMock := &metricsmock.Metrics{}
 	metricsMock.RequestCountFn = func(ctx context.Context, offset time.Duration) (int64, error) {
@@ -333,7 +332,7 @@ func TestUpdateService(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		runclient.ReplaceServiceFn = func(namespace, serviceID string, svc *run.Service) (*run.Service, error) {
+		kProvider.ReplaceServiceFn = func(namespace, serviceID string, svc *run.Service) (*run.Service, error) {
 			return svc, nil
 		}
 
@@ -347,9 +346,7 @@ func TestUpdateService(t *testing.T) {
 		svcRecord := &rollout.ServiceRecord{Service: svc}
 
 		strategy.HealthCriteria = test.healthCriteria
-		lg := logrus.New()
-		lg.SetLevel(logrus.DebugLevel)
-		r := rollout.New(context.TODO(), metricsMock, svcRecord, strategy).WithClient(runclient).WithLogger(lg).WithClock(clockMock)
+		r := rollout.New(context.TODO(), metricsMock, svcRecord, strategy).WithKnativeProvider(kProvider).WithClock(clockMock)
 
 		t.Run(test.name, func(tt *testing.T) {
 			retSvc, changedTraffic, err := r.UpdateService(svc)
