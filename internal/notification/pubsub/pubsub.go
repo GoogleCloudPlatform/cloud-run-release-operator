@@ -7,26 +7,31 @@ import (
 	"regexp"
 
 	cloudpubsub "cloud.google.com/go/pubsub"
-	"github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/health"
-	"github.com/GoogleCloudPlatform/cloud-run-release-operator/internal/util"
+	"github.com/GoogleCloudPlatform/cloud-run-release-manager/internal/health"
+	"github.com/GoogleCloudPlatform/cloud-run-release-manager/internal/util"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/run/v1"
 )
 
+// Event types.
+const (
+	rolloutEvent  = "rollout"
+	rollbackEvent = "rollback"
+)
+
 // Client represents a client to Google Cloud Pub/Sub.
 type Client interface {
-	Publish(ctx context.Context, msg Message) error
+	Publish(ctx context.Context, event RolloutEvent) error
 }
 
 // PubSub is a Google Cloud Pub/Sub client to publish messages.
 type PubSub struct {
-	client *cloudpubsub.Client
-	topic  *cloudpubsub.Topic
+	topic *cloudpubsub.Topic
 }
 
-// Message is the format when publishing to Pub/Sub.
-type Message struct {
+// RolloutEvent is the format of an event published to Pub/Sub.
+type RolloutEvent struct {
 	Event                        string       `json:"event"`
 	CandidateRevisionName        string       `json:"candidateRevisionName"`
 	CandidateRevisionPercent     int          `json:"candidateRevisionPercent"`
@@ -35,7 +40,7 @@ type Message struct {
 	Service                      *run.Service `json:"service"`
 }
 
-// New initializes a PubSub client.
+// New initializes a PubSub client to a topic in a project.
 func New(ctx context.Context, projectID string, topicName string) (ps PubSub, err error) {
 	logger := util.LoggerFrom(ctx)
 	client, err := cloudpubsub.NewClient(ctx, projectID)
@@ -49,19 +54,20 @@ func New(ctx context.Context, projectID string, topicName string) (ps PubSub, er
 	}
 	project := match[1]
 	topicID := match[2]
-	logger.WithFields(logrus.Fields{"topicProject": project, "topicID": topicID}).Debug("parsed topic name value")
+	logger.WithFields(logrus.Fields{"topicProject": project, "topicID": topicID}).Debug("parsed pubsub topic configuration")
 
 	return PubSub{
-		client: client,
-		topic:  client.TopicInProject(topicID, project),
+		topic: client.TopicInProject(topicID, project),
 	}, nil
 }
 
-// NewMessage initializes a message.
-func NewMessage(svc *run.Service, diagnosis health.DiagnosisResult, candidateWasPromoted bool) (Message, error) {
-	event := "rollout"
+// NewRolloutEvent initializes an event to publish to PubSub.
+//
+// svc must be the updated Service instance as the result of the rollout.
+func NewRolloutEvent(svc *run.Service, diagnosis health.DiagnosisResult, candidateWasPromoted bool) (RolloutEvent, error) {
+	event := rolloutEvent
 	if diagnosis == health.Unhealthy {
-		event = "rollback"
+		event = rollbackEvent
 	}
 
 	var candidateRevision *run.TrafficTarget
@@ -73,10 +79,10 @@ func NewMessage(svc *run.Service, diagnosis health.DiagnosisResult, candidateWas
 		candidateRevision, err = findRevisionWithTag(svc, "candidate")
 	}
 	if err != nil {
-		return Message{}, errors.New("failed to find candidate revision traffic target")
+		return RolloutEvent{}, errors.New("failed to find candidate revision traffic target")
 	}
 
-	return Message{
+	return RolloutEvent{
 		Event:                        event,
 		CandidateRevisionName:        candidateRevision.RevisionName,
 		CandidateRevisionPercent:     int(candidateRevision.Percent),
@@ -87,8 +93,8 @@ func NewMessage(svc *run.Service, diagnosis health.DiagnosisResult, candidateWas
 }
 
 // Publish publishes message to the topic.
-func (ps PubSub) Publish(ctx context.Context, msg Message) error {
-	data, err := json.Marshal(msg)
+func (ps PubSub) Publish(ctx context.Context, event RolloutEvent) error {
+	data, err := json.Marshal(event)
 	if err != nil {
 		return errors.Wrap(err, "failed to marshal message")
 	}
@@ -97,8 +103,17 @@ func (ps PubSub) Publish(ctx context.Context, msg Message) error {
 	ps.topic.Publish(ctx, &cloudpubsub.Message{
 		Data: data,
 	})
-	logger.WithField("size", len(data)).Debug("published data to Pub/Sub")
+	logger.WithField("size", len(data)).Debug("event published to Pub/Sub")
 	return nil
+}
+
+// Stop is a wrapper around Cloud Run Pub/Sub package's Stop method on Topic.
+//
+// It sends all remaining published messages and stop goroutines created for
+// handling publishing. Returns once all outstanding messages have been sent or
+// have failed to be sent.
+func (ps PubSub) Stop() {
+	ps.topic.Stop()
 }
 
 // findRevisionWithTag scans the service's traffic configuration and returns the
@@ -131,6 +146,8 @@ func findRevisionWithTag(svc *run.Service, tag string) (*run.TrafficTarget, erro
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to parse the service's url %s", svc.Status.Url)
 	}
+
+	// TODO: this only works for Cloud Run fully managed.
 	url.Host = tag + "---" + url.Host
 	target.Url = url.String()
 
