@@ -75,7 +75,7 @@ func getServicesByLabel(ctx context.Context, provider knative.Provider, namespac
 	})
 
 	lg.Debug("querying for services in provider")
-	svcs, err := provider.ServicesWithLabelSelector(namespace, labelSelector)
+	svcs, err := provider.ListServices(namespace, labelSelector)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get services with label %q", labelSelector)
 	}
@@ -97,7 +97,7 @@ func determineRegions(ctx context.Context, target config.Target) ([]string, erro
 	}
 
 	logger.Debug("retrieving all regions from the API")
-	regions, err := cloudrun.Regions(ctx, target.Project)
+	regions, err := cloudrun.FullyManagedRegions(ctx, target.Project)
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot get list of regions from Cloud Run API")
 	}

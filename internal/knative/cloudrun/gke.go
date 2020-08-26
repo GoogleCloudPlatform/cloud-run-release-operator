@@ -28,6 +28,7 @@ func newGKEClient(ctx context.Context, project, zone, clusterName string) (*http
 		return nil, "", fmt.Errorf("could not create client for Google Kubernetes Engine: %v", err)
 	}
 
+	// TODO: handle regional clusters
 	cluster, err := containerService.Projects.Zones.Clusters.Get(project, zone, clusterName).Context(ctx).Do()
 	if err != nil {
 		return nil, "", errors.Wrapf(err, "failed to get cluster %q in project %q, zone %q", clusterName, project, zone)
@@ -37,7 +38,6 @@ func newGKEClient(ctx context.Context, project, zone, clusterName string) (*http
 	if err != nil {
 		return nil, "", errors.Wrap(err, "failed to initialize HTTP client")
 	}
-
 	return hClient, cluster.Endpoint, nil
 }
 

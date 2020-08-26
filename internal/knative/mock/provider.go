@@ -7,8 +7,8 @@ import (
 
 // Provider represents a mock implementation of knative.Provider.
 type Provider struct {
-	ServicesWithLabelSelectorFn      func(namespace, labelSelector string) ([]*run.Service, error)
-	ServicesWithLabelSelectorInvoked bool
+	ListServicesFn      func(namespace, labelSelector string) ([]*run.Service, error)
+	ListServicesInvoked bool
 
 	ReplaceServiceFn      func(namespace, serviceID string, svc *run.Service) (*run.Service, error)
 	ReplaceServiceInvoked bool
@@ -17,10 +17,10 @@ type Provider struct {
 	LoggingFieldsInvoked bool
 }
 
-// ServicesWithLabelSelector invokes the mock implementation and marks the function as invoked.
-func (p *Provider) ServicesWithLabelSelector(namespace, service string) ([]*run.Service, error) {
-	p.ServicesWithLabelSelectorInvoked = true
-	return p.ServicesWithLabelSelectorFn(namespace, service)
+// ListServices invokes the mock implementation and marks the function as invoked.
+func (p *Provider) ListServices(namespace, labelSelector string) ([]*run.Service, error) {
+	p.ListServicesInvoked = true
+	return p.ListServicesFn(namespace, labelSelector)
 }
 
 // ReplaceService invokes the mock implementation and marks the function as invoked.
