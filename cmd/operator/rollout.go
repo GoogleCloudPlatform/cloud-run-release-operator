@@ -10,14 +10,15 @@ import (
 	"github.com/GoogleCloudPlatform/cloud-run-release-manager/internal/metrics/sheets"
 	"github.com/GoogleCloudPlatform/cloud-run-release-manager/internal/metrics/stackdriver"
 	"github.com/GoogleCloudPlatform/cloud-run-release-manager/internal/rollout"
-	runapi "github.com/GoogleCloudPlatform/cloud-run-release-manager/internal/run"
+	"github.com/GoogleCloudPlatform/cloud-run-release-manager/internal/util"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
 // runRollouts concurrently handles the rollout of the targeted services.
 func runRollouts(ctx context.Context, logger *logrus.Logger, strategy config.Strategy) []error {
-	svcs, err := getTargetedServices(ctx, logger, strategy.Target)
+	ctx = util.ContextWithLogger(ctx, logrus.NewEntry(logger))
+	svcs, err := getTargetedServices(ctx, strategy.Target)
 	if err != nil {
 		return []error{errors.Wrap(err, "failed to get targeted services")}
 	}
@@ -50,21 +51,13 @@ func runRollouts(ctx context.Context, logger *logrus.Logger, strategy config.Str
 
 // handleRollout manages the rollout process for a single service.
 func handleRollout(ctx context.Context, logger *logrus.Logger, service *rollout.ServiceRecord, strategy config.Strategy) error {
-	lg := logger.WithFields(logrus.Fields{
-		"project": service.Project,
-		"service": service.Metadata.Name,
-		"region":  service.Region,
-	})
+	lg := logger.WithFields(service.KProvider.LoggingFields()).WithField("service", service.Metadata.Name)
 
-	client, err := runapi.NewAPIClient(ctx, service.Region)
-	if err != nil {
-		return errors.Wrap(err, "failed to initialize Cloud Run API client")
-	}
-	metricsProvider, err := chooseMetricsProvider(ctx, lg, service.Project, service.Region, service.Metadata.Name)
+	metricsProvider, err := chooseMetricsProvider(ctx, lg, service.Namespace, service.Location, service.Metadata.Name)
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize metrics provider")
 	}
-	roll := rollout.New(ctx, metricsProvider, service, strategy).WithClient(client).WithLogger(lg.Logger)
+	roll := rollout.New(ctx, metricsProvider, service, strategy).WithLogger(lg)
 
 	changed, err := roll.Rollout()
 	if err != nil {
