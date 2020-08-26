@@ -171,7 +171,6 @@ func main() {
 		if err != nil {
 			logger.Fatalf("failed to initialize Pub/Sub client: %v", err)
 		}
-
 	}
 
 	if flCLI {

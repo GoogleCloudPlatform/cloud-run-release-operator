@@ -178,7 +178,7 @@ func (r *Rollout) UpdateService(svc *run.Service) (*run.Service, bool, error) {
 	r.setHealthReportAnnotation(svc, report)
 
 	err = r.replaceServiceAndPublish(svc, trafficChanged, diagnosis.OverallResult)
-	return svc, true, errors.Wrap(err, "failed to replace service")
+	return svc, trafficChanged, errors.Wrap(err, "failed to replace service")
 }
 
 // replaceServiceAndPublish updates the service object in Cloud Run. Then, it
