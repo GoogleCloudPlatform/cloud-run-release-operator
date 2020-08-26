@@ -15,12 +15,6 @@ import (
 	"google.golang.org/api/container/v1"
 )
 
-// ClusterClient is a GKE client.
-type ClusterClient struct {
-	HTTPClient *http.Client
-	Endpoint   string
-}
-
 // newGKEClient initializes a client for GKE cluster.
 func newGKEClient(ctx context.Context, project, zone, clusterName string) (*http.Client, string, error) {
 	tokenSource, err := google.DefaultTokenSource(ctx, compute.CloudPlatformScope)
