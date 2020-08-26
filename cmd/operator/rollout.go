@@ -10,14 +10,15 @@ import (
 	"github.com/GoogleCloudPlatform/cloud-run-release-manager/internal/metrics/sheets"
 	"github.com/GoogleCloudPlatform/cloud-run-release-manager/internal/metrics/stackdriver"
 	"github.com/GoogleCloudPlatform/cloud-run-release-manager/internal/rollout"
-	runapi "github.com/GoogleCloudPlatform/cloud-run-release-manager/internal/run"
+	"github.com/GoogleCloudPlatform/cloud-run-release-manager/internal/util"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
 // runRollouts concurrently handles the rollout of the targeted services.
 func runRollouts(ctx context.Context, logger *logrus.Logger, strategy config.Strategy) []error {
-	svcs, err := getTargetedServices(ctx, logger, strategy.Target)
+	ctx = util.ContextWithLogger(ctx, logrus.NewEntry(logger))
+	svcs, err := getTargetedServices(ctx, strategy.Target)
 	if err != nil {
 		return []error{errors.Wrap(err, "failed to get targeted services")}
 	}
@@ -50,21 +51,15 @@ func runRollouts(ctx context.Context, logger *logrus.Logger, strategy config.Str
 
 // handleRollout manages the rollout process for a single service.
 func handleRollout(ctx context.Context, logger *logrus.Logger, service *rollout.ServiceRecord, strategy config.Strategy) error {
-	lg := logger.WithFields(logrus.Fields{
-		"project": service.Project,
-		"service": service.Metadata.Name,
-		"region":  service.Region,
-	})
+	lg := logger.WithFields(service.KProvider.LoggingFields()).
+		WithField("namespace", service.Namespace).
+		WithField("service", service.Metadata.Name)
 
-	client, err := runapi.NewAPIClient(ctx, service.Region)
-	if err != nil {
-		return errors.Wrap(err, "failed to initialize Cloud Run API client")
-	}
-	metricsProvider, err := chooseMetricsProvider(ctx, lg, service.Project, service.Region, service.Metadata.Name)
+	metricsProvider, err := chooseMetricsProvider(ctx, lg, service.Location, service)
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize metrics provider")
 	}
-	roll := rollout.New(ctx, metricsProvider, service, strategy).WithClient(client).WithLogger(lg.Logger)
+	roll := rollout.New(ctx, metricsProvider, service, strategy).WithLogger(lg)
 
 	changed, err := roll.Rollout()
 	if err != nil {
@@ -94,11 +89,20 @@ func rolloutErrsToString(errs []error) (errsStr string) {
 
 // chooseMetricsProvider checks the CLI flags and determine which metrics
 // provider should be used for the rollout.
-func chooseMetricsProvider(ctx context.Context, logger *logrus.Entry, project, region, svcName string) (metrics.Provider, error) {
+func chooseMetricsProvider(ctx context.Context, logger *logrus.Entry, location string, svc *rollout.ServiceRecord) (metrics.Provider, error) {
 	if flGoogleSheetsID != "" {
 		logger.Debug("using Google Sheets as metrics provider")
-		return sheets.NewProvider(ctx, flGoogleSheetsID, "", region, svcName)
+		return sheets.NewProvider(ctx, flGoogleSheetsID, "", location, svc.Metadata.Name)
 	}
+
 	logger.Debug("using Cloud Monitoring (Stackdriver) as metrics provider")
-	return stackdriver.NewProvider(ctx, project, region, svcName)
+	provider, err := stackdriver.NewProvider(ctx, flProject, location, svc.Metadata.Name)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to initialize stackdriver provider")
+	}
+	if flPlatform == config.PlatformGKE {
+		logger.Debug("pointing stackdriver to Cloud Run for Anthos")
+		provider = provider.WithGKEPlatform(svc.Namespace, svc.Metadata.ClusterName)
+	}
+	return provider, nil
 }

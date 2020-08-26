@@ -44,7 +44,6 @@ type Target struct {
 	// Anthos target configuration.
 	GKEClusterLocation string
 	GKEClusterName     string
-	GKENamespace       string
 }
 
 // HealthCriterion is a metrics threshold that should be met to consider a
@@ -80,13 +79,12 @@ func NewManagedTarget(project string, regions []string, labelSelector string) Ta
 }
 
 // NewGKETarget initializes a target for Cloud Run on Anthos.
-func NewGKETarget(project, clusterLocation, clusterName, namespace, label string) Target {
+func NewGKETarget(project, clusterLocation, clusterName, label string) Target {
 	return Target{
 		Platform:           PlatformGKE,
 		Project:            project,
 		GKEClusterLocation: clusterLocation,
 		GKEClusterName:     clusterName,
-		GKENamespace:       namespace,
 		LabelSelector:      label,
 	}
 }
@@ -179,9 +177,6 @@ func validateTarget(target Target) error {
 		}
 		if target.GKEClusterName == "" {
 			return errors.New("cluster name required for GKE platform")
-		}
-		if target.GKENamespace == "" {
-			return errors.New("namespace required for GKE platform")
 		}
 	}
 

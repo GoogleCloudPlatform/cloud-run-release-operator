@@ -68,9 +68,6 @@ var (
 	// Anthos target configuration
 	flGKEClusterLocation string
 	flGKECluster         string
-	// TODO(gvso): Support multiple namespaces or all namespaces if none is
-	// specified.
-	flGKENamespace string
 
 	// Fully-managed target config. Empty array means all regions.
 	flRegions       []string
@@ -106,7 +103,6 @@ func init() {
 	flag.StringVar(&flLabelSelector, "label", "rollout-strategy=gradual", "filter services based on a label (e.g. team=backend)")
 	flag.StringVar(&flGKEClusterLocation, "cluster-location", "", "(-platform=gke only) zone in which the cluster is located")
 	flag.StringVar(&flGKECluster, "cluster", "", "(-platform=gke only) ID of the cluster")
-	flag.StringVar(&flGKENamespace, "namespace", "default", "(-platform=gke only) Kubernetes namespace where to look for Knative services")
 	flag.StringVar(&flRegionsString, "regions", "", "the Cloud Run regions where the services should be looked at")
 	flag.Var(&flSteps, "step", "a percentage in traffic the candidate should go through")
 	flag.StringVar(&flStepsString, "steps", "5,20,50,80", "define steps in one flag separated by commas (e.g. 5,30,60)")
@@ -168,7 +164,7 @@ func main() {
 	if flPlatform == config.PlatformManaged {
 		target = config.NewManagedTarget(flProject, flRegions, flLabelSelector)
 	} else {
-		target = config.NewGKETarget(flProject, flGKEClusterLocation, flGKECluster, flGKENamespace, flLabelSelector)
+		target = config.NewGKETarget(flProject, flGKEClusterLocation, flGKECluster, flLabelSelector)
 	}
 	healthCriteria := healthCriteriaFromFlags(flMinRequestCount, flErrorRate, flLatencyP99, flLatencyP95, flLatencyP50)
 	printHealthCriteria(logger, healthCriteria)
@@ -232,9 +228,6 @@ func validateFlags() error {
 		if flGKEClusterLocation == "" {
 			return errors.Errorf("gke: cluster location must be specified")
 		}
-		if flGKENamespace == "" {
-			return errors.Errorf("gke: namespace cannot be empty")
-		}
 		return nil
 	}
 
@@ -264,11 +257,9 @@ func flagsToString() string {
 
 	if flPlatform == config.PlatformGKE {
 		str += fmt.Sprintf("-cluster-location=%s\n"+
-			"-cluster=%s\n"+
-			"-namespace=%s\n",
+			"-cluster=%s\n",
 			flGKEClusterLocation,
 			flGKECluster,
-			flGKENamespace,
 		)
 	} else {
 		regionsStr := "all"

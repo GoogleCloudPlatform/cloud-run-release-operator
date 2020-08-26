@@ -125,7 +125,7 @@ func TestStrategy_Validate(t *testing.T) {
 		},
 		{
 			name:                "GKE platform requires cluster location",
-			target:              config.NewGKETarget("myproject", "", "testcluster", "default", "team=backend"),
+			target:              config.NewGKETarget("myproject", "", "testcluster", "team=backend"),
 			steps:               []int64{5, 30, 60},
 			healthOffset:        10 * time.Minute,
 			timeBetweenRollouts: 10 * time.Minute,
@@ -137,19 +137,7 @@ func TestStrategy_Validate(t *testing.T) {
 		},
 		{
 			name:                "GKE platform requires cluster name",
-			target:              config.NewGKETarget("myproject", "us-central1-a", "", "default", "team=backend"),
-			steps:               []int64{5, 30, 60},
-			healthOffset:        10 * time.Minute,
-			timeBetweenRollouts: 10 * time.Minute,
-			healthCriteria: []config.HealthCriterion{
-				{Metric: config.LatencyMetricsCheck, Percentile: 99, Threshold: 750},
-				{Metric: config.RequestCountMetricsCheck, Threshold: 1000},
-			},
-			shouldErr: true,
-		},
-		{
-			name:                "GKE platform requires namespace",
-			target:              config.NewGKETarget("myproject", "us-central1-a", "testcluster", "", "team=backend"),
+			target:              config.NewGKETarget("myproject", "us-central1-a", "", "team=backend"),
 			steps:               []int64{5, 30, 60},
 			healthOffset:        10 * time.Minute,
 			timeBetweenRollouts: 10 * time.Minute,
