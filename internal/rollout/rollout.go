@@ -256,12 +256,12 @@ func (r *Rollout) publishEvent(svc *run.Service, diagnosis health.DiagnosisResul
 
 	event, err := pubsub.NewRolloutEvent(svc, diagnosis, r.promoteToStable)
 	if err != nil {
-		return errors.Wrap(err, "failed to create message")
+		return errors.Wrap(err, "failed to create rollout event message")
 	}
 	ctx := util.ContextWithLogger(r.ctx, r.log)
 	err = r.pubsubClient.Publish(ctx, event)
 	if err != nil {
-		return errors.Wrap(err, "error when publishing message")
+		return errors.Wrap(err, "error when publishing rollout event")
 	}
 	return nil
 }
