@@ -166,6 +166,7 @@ func main() {
 	ctx := context.Background()
 	var pubsub ps.Client
 	if flPubSubTopic != "" {
+		logger.WithField("topic", flPubSubTopic).Debug("will publish to Pub/Sub")
 		ctx = util.ContextWithLogger(ctx, logrus.NewEntry(logger))
 		pubsub, err = ps.New(ctx, flProject, flPubSubTopic)
 		if err != nil {

@@ -187,7 +187,7 @@ func (r *Rollout) replaceServiceAndPublish(svc *run.Service, trafficChanged bool
 	svc, err := r.runClient.ReplaceService(r.project, r.serviceName, svc)
 
 	if trafficChanged {
-		pubErr := r.publish(svc, diagnosis)
+		pubErr := r.publishEvent(svc, diagnosis)
 		if pubErr != nil {
 			r.log.Warnf("failed to publish rollout/rollback message: %v", pubErr)
 		}
@@ -249,7 +249,7 @@ func (r *Rollout) diagnoseCandidate(candidate string, healthCriteria []config.He
 	return d, errors.Wrap(err, "failed to diagnose candidate's health")
 }
 
-func (r *Rollout) publish(svc *run.Service, diagnosis health.DiagnosisResult) error {
+func (r *Rollout) publishEvent(svc *run.Service, diagnosis health.DiagnosisResult) error {
 	if r.pubsubClient == nil {
 		return nil
 	}
@@ -263,8 +263,5 @@ func (r *Rollout) publish(svc *run.Service, diagnosis health.DiagnosisResult) er
 	if err != nil {
 		return errors.Wrap(err, "error when publishing message")
 	}
-
-	// Wait for all messages to be sent (or to fail).
-	r.pubsubClient.Stop()
 	return nil
 }
