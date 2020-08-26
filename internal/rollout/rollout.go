@@ -30,6 +30,8 @@ const (
 type ServiceRecord struct {
 	*run.Service
 	KProvider knative.Provider
+
+	// For Cloud Run fully managed, the namespace is the project ID.
 	Namespace string
 
 	// The zone or region the service is deployed at.
