@@ -9,6 +9,7 @@ import (
 	"github.com/GoogleCloudPlatform/cloud-run-release-manager/internal/config"
 	"github.com/GoogleCloudPlatform/cloud-run-release-manager/internal/health"
 	"github.com/GoogleCloudPlatform/cloud-run-release-manager/internal/metrics"
+	"github.com/GoogleCloudPlatform/cloud-run-release-manager/internal/notification/pubsub"
 	runapi "github.com/GoogleCloudPlatform/cloud-run-release-manager/internal/run"
 	"github.com/GoogleCloudPlatform/cloud-run-release-manager/internal/util"
 	"github.com/jonboulle/clockwork"
@@ -45,6 +46,7 @@ type Rollout struct {
 	runClient       runapi.Client
 	log             *logrus.Entry
 	time            clockwork.Clock
+	pubsubClient    pubsub.Client
 
 	// Used to determine if candidate should become stable during update.
 	promoteToStable bool
@@ -99,6 +101,12 @@ func (r *Rollout) WithClock(clock clockwork.Clock) *Rollout {
 	return r
 }
 
+// WithPubSub updates the Pub/Sub client in the rollout instance.
+func (r *Rollout) WithPubSub(psClient pubsub.Client) *Rollout {
+	r.pubsubClient = psClient
+	return r
+}
+
 // Rollout handles the gradual rollout.
 func (r *Rollout) Rollout() (bool, error) {
 	r.log = r.log.WithFields(logrus.Fields{
@@ -145,7 +153,7 @@ func (r *Rollout) UpdateService(svc *run.Service) (*run.Service, bool, error) {
 		svc = r.updateAnnotations(svc, stable, candidate)
 		r.setHealthReportAnnotation(svc, "new candidate, no health report available yet")
 
-		err := r.replaceService(svc)
+		err := r.replaceServiceAndPublish(svc, true, health.Healthy)
 		return svc, true, errors.Wrap(err, "failed to replace service")
 	}
 
@@ -169,13 +177,21 @@ func (r *Rollout) UpdateService(svc *run.Service) (*run.Service, bool, error) {
 	report := health.StringReport(r.strategy.HealthCriteria, diagnosis, trafficChanged)
 	r.setHealthReportAnnotation(svc, report)
 
-	err = r.replaceService(svc)
-	return svc, trafficChanged, errors.Wrap(err, "failed to replace service")
+	err = r.replaceServiceAndPublish(svc, trafficChanged, diagnosis.OverallResult)
+	return svc, true, errors.Wrap(err, "failed to replace service")
 }
 
-// replaceService updates the service object in Cloud Run.
-func (r *Rollout) replaceService(svc *run.Service) error {
-	_, err := r.runClient.ReplaceService(r.project, r.serviceName, svc)
+// replaceServiceAndPublish updates the service object in Cloud Run. Then, it
+// publishes to Google Cloud Pub/Sub.
+func (r *Rollout) replaceServiceAndPublish(svc *run.Service, trafficChanged bool, diagnosis health.DiagnosisResult) error {
+	svc, err := r.runClient.ReplaceService(r.project, r.serviceName, svc)
+
+	if trafficChanged {
+		pubErr := r.publish(svc, diagnosis)
+		if pubErr != nil {
+			r.log.Warnf("failed to publish rollout/rollback message: %v", pubErr)
+		}
+	}
 	return errors.Wrapf(err, "could not update service %q", r.serviceName)
 }
 
@@ -231,4 +247,24 @@ func (r *Rollout) diagnoseCandidate(candidate string, healthCriteria []config.He
 	r.log.Debug("diagnosing candidate's health")
 	d, err = health.Diagnose(ctx, healthCriteria, metricsValues)
 	return d, errors.Wrap(err, "failed to diagnose candidate's health")
+}
+
+func (r *Rollout) publish(svc *run.Service, diagnosis health.DiagnosisResult) error {
+	if r.pubsubClient == nil {
+		return nil
+	}
+
+	event, err := pubsub.NewRolloutEvent(svc, diagnosis, r.promoteToStable)
+	if err != nil {
+		return errors.Wrap(err, "failed to create message")
+	}
+	ctx := util.ContextWithLogger(r.ctx, r.log)
+	err = r.pubsubClient.Publish(ctx, event)
+	if err != nil {
+		return errors.Wrap(err, "error when publishing message")
+	}
+
+	// Wait for all messages to be sent (or to fail).
+	r.pubsubClient.Stop()
+	return nil
 }

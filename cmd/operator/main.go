@@ -28,6 +28,8 @@ import (
 
 	"cloud.google.com/go/compute/metadata"
 	"github.com/GoogleCloudPlatform/cloud-run-release-manager/internal/config"
+	ps "github.com/GoogleCloudPlatform/cloud-run-release-manager/internal/notification/pubsub"
+	"github.com/GoogleCloudPlatform/cloud-run-release-manager/internal/util"
 	sdlog "github.com/TV4/logrus-stackdriver-formatter"
 	isatty "github.com/mattn/go-isatty"
 	"github.com/pkg/errors"
@@ -61,6 +63,7 @@ var (
 	flHTTPAddr        string
 	flProject         string
 	flLabelSelector   string
+	flPubSubTopic     string
 
 	// Empty array means all regions.
 	flRegions       []string
@@ -93,6 +96,7 @@ func init() {
 	flag.StringVar(&flHTTPAddr, "http-addr", defaultAddr, "address where to listen to http requests (e.g. :8080)")
 	flag.StringVar(&flProject, "project", "", "project in which the service is deployed")
 	flag.StringVar(&flLabelSelector, "label", "rollout-strategy=gradual", "filter services based on a label (e.g. team=backend)")
+	flag.StringVar(&flPubSubTopic, "notify-pubsub", "", "publish rollout events to the given Google Cloud Pub/Sub topic")
 	flag.StringVar(&flRegionsString, "regions", "", "the Cloud Run regions where the services should be looked at")
 	flag.Var(&flSteps, "step", "a percentage in traffic the candidate should go through")
 	flag.StringVar(&flStepsString, "steps", "5,20,50,80", "define steps in one flag separated by commas (e.g. 5,30,60)")
@@ -160,19 +164,29 @@ func main() {
 	}
 
 	ctx := context.Background()
+	var pubsub ps.Client
+	if flPubSubTopic != "" {
+		ctx = util.ContextWithLogger(ctx, logrus.NewEntry(logger))
+		pubsub, err = ps.New(ctx, flProject, flPubSubTopic)
+		if err != nil {
+			logger.Fatalf("failed to initialize Pub/Sub client: %v", err)
+		}
+
+	}
+
 	if flCLI {
-		runDaemon(ctx, logger, cfg)
+		runDaemon(ctx, logger, cfg, pubsub)
 	} else {
-		http.HandleFunc("/rollout", makeRolloutHandler(logger, cfg))
+		http.HandleFunc("/rollout", makeRolloutHandler(logger, cfg, pubsub))
 		logger.WithField("addr", flHTTPAddr).Infof("starting server")
 		logger.Fatal(http.ListenAndServe(flHTTPAddr, nil))
 	}
 }
 
-func runDaemon(ctx context.Context, logger *logrus.Logger, cfg *config.Config) {
+func runDaemon(ctx context.Context, logger *logrus.Logger, cfg *config.Config, pubsub ps.Client) {
 	for {
 		// TODO(gvso): Handle all the strategies.
-		errs := runRollouts(ctx, logger, cfg.Strategies[0])
+		errs := runRollouts(ctx, logger, cfg.Strategies[0], pubsub)
 		errsStr := rolloutErrsToString(errs)
 		if len(errs) != 0 {
 			logger.Warnf("there were %d errors: \n%s", len(errs), errsStr)

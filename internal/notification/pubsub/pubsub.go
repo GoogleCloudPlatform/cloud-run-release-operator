@@ -23,6 +23,7 @@ const (
 // Client represents a client to Google Cloud Pub/Sub.
 type Client interface {
 	Publish(ctx context.Context, event RolloutEvent) error
+	Stop()
 }
 
 // PubSub is a Google Cloud Pub/Sub client to publish messages.
