@@ -100,20 +100,17 @@ func (ps PubSub) Publish(ctx context.Context, event RolloutEvent) error {
 	}
 
 	logger := util.LoggerFrom(ctx)
-	ps.topic.Publish(ctx, &cloudpubsub.Message{
-		Data: data,
-	})
-	logger.WithField("size", len(data)).Debug("event published to Pub/Sub")
-	return nil
-}
+	result := ps.topic.Publish(ctx, &cloudpubsub.Message{Data: data})
+	serverID, err := result.Get(ctx)
+	if err != nil {
+		return errors.Wrap(err, "failed to publish event to Pub/Sub")
+	}
 
-// Stop is a wrapper around Cloud Run Pub/Sub package's Stop method on Topic.
-//
-// It sends all remaining published messages and stop goroutines created for
-// handling publishing. Returns once all outstanding messages have been sent or
-// have failed to be sent.
-func (ps PubSub) Stop() {
-	ps.topic.Stop()
+	logger.WithFields(logrus.Fields{
+		"size":     len(data),
+		"serverID": serverID,
+	}).Debug("event published to Pub/Sub")
+	return nil
 }
 
 // findRevisionWithTag scans the service's traffic configuration and returns the

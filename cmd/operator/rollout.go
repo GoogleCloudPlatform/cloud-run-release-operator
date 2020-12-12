@@ -9,6 +9,7 @@ import (
 	"github.com/GoogleCloudPlatform/cloud-run-release-manager/internal/metrics"
 	"github.com/GoogleCloudPlatform/cloud-run-release-manager/internal/metrics/sheets"
 	"github.com/GoogleCloudPlatform/cloud-run-release-manager/internal/metrics/stackdriver"
+	ps "github.com/GoogleCloudPlatform/cloud-run-release-manager/internal/notification/pubsub"
 	"github.com/GoogleCloudPlatform/cloud-run-release-manager/internal/rollout"
 	runapi "github.com/GoogleCloudPlatform/cloud-run-release-manager/internal/run"
 	"github.com/pkg/errors"
@@ -16,7 +17,7 @@ import (
 )
 
 // runRollouts concurrently handles the rollout of the targeted services.
-func runRollouts(ctx context.Context, logger *logrus.Logger, strategy config.Strategy) []error {
+func runRollouts(ctx context.Context, logger *logrus.Logger, strategy config.Strategy, pubsub ps.Client) []error {
 	svcs, err := getTargetedServices(ctx, logger, strategy.Target)
 	if err != nil {
 		return []error{errors.Wrap(err, "failed to get targeted services")}
@@ -32,16 +33,16 @@ func runRollouts(ctx context.Context, logger *logrus.Logger, strategy config.Str
 	)
 	for _, svc := range svcs {
 		wg.Add(1)
-		go func(ctx context.Context, lg *logrus.Logger, svc *rollout.ServiceRecord, strategy config.Strategy) {
+		go func(ctx context.Context, lg *logrus.Logger, svc *rollout.ServiceRecord, strategy config.Strategy, pubsub ps.Client) {
 			defer wg.Done()
-			err := handleRollout(ctx, lg, svc, strategy)
+			err := handleRollout(ctx, lg, svc, strategy, pubsub)
 			if err != nil {
 				lg.Debugf("rollout error for service %q: %+v", svc.Service.Metadata.Name, err)
 				mu.Lock()
 				errs = append(errs, err)
 				mu.Unlock()
 			}
-		}(ctx, logger, svc, strategy)
+		}(ctx, logger, svc, strategy, pubsub)
 	}
 	wg.Wait()
 
@@ -49,7 +50,7 @@ func runRollouts(ctx context.Context, logger *logrus.Logger, strategy config.Str
 }
 
 // handleRollout manages the rollout process for a single service.
-func handleRollout(ctx context.Context, logger *logrus.Logger, service *rollout.ServiceRecord, strategy config.Strategy) error {
+func handleRollout(ctx context.Context, logger *logrus.Logger, service *rollout.ServiceRecord, strategy config.Strategy, pubsub ps.Client) error {
 	lg := logger.WithFields(logrus.Fields{
 		"project": service.Project,
 		"service": service.Metadata.Name,
@@ -64,7 +65,7 @@ func handleRollout(ctx context.Context, logger *logrus.Logger, service *rollout.
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize metrics provider")
 	}
-	roll := rollout.New(ctx, metricsProvider, service, strategy).WithClient(client).WithLogger(lg.Logger)
+	roll := rollout.New(ctx, metricsProvider, service, strategy).WithClient(client).WithLogger(lg.Logger).WithPubSub(pubsub)
 
 	changed, err := roll.Rollout()
 	if err != nil {
